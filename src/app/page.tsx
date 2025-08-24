@@ -35,7 +35,6 @@ import ColorPanel from '@/components/panels/color-panel';
 import FiltersPanel from '@/components/panels/filters-panel';
 import NewCanvasPanel, { type CanvasSettings } from '@/components/panels/new-canvas-panel';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge';
 const MAX_HISTORY_SIZE = 30;
@@ -62,7 +61,10 @@ export default function Home() {
   // Layer state
   const [layers, setLayers] = useState<Layer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
-  const getActiveLayer = useCallback(() => layers.find(l => l.id === activeLayerId), [layers, activeLayerId]);
+
+  const getActiveLayer = useCallback(() => {
+    return layers.find(l => l.id === activeLayerId) || null;
+  }, [layers, activeLayerId]);
 
   // Undo/Redo state
   const [history, setHistory] = useState<ImageData[]>([]);
@@ -98,7 +100,12 @@ export default function Home() {
   const saveState = useCallback(() => {
     const activeLayer = getActiveLayer();
     if (activeLayer) {
-      const canvasData = activeLayer.context.getImageData(0, 0, activeLayer.canvas.width, activeLayer.canvas.height);
+      const canvasData = activeLayer.context.getImageData(
+        0,
+        0,
+        activeLayer.canvas.width,
+        activeLayer.canvas.height
+      );
       
       setHistory(prevHistory => {
         const newHistory = prevHistory.slice(0, historyIndex + 1);
@@ -108,13 +115,10 @@ export default function Home() {
         }
         return newHistory;
       });
-      setHistoryIndex(prev => {
-        const newHistory = history.slice(0, prev + 1);
-        const newIndex = newHistory.length;
-        return Math.min(newIndex, MAX_HISTORY_SIZE - 1);
-      });
+
+      setHistoryIndex(prev => Math.min(prev + 1, MAX_HISTORY_SIZE - 1));
     }
-  }, [historyIndex, getActiveLayer, history]);
+  }, [historyIndex, getActiveLayer]);
 
   const restoreState = useCallback((index: number) => {
     const activeLayer = getActiveLayer();
@@ -122,7 +126,7 @@ export default function Home() {
       activeLayer.context.putImageData(history[index], 0, 0);
       compositeLayers();
     }
-  }, [history, getActiveLayer, compositeLayers]);
+  }, [history, compositeLayers, getActiveLayer]);
 
   // Initial setup
   useEffect(() => {
@@ -164,7 +168,6 @@ export default function Home() {
       setHistory([]);
       setHistoryIndex(-1);
       
-      // Composite once to draw background
       compositeLayers();
     }
   }, [canvas, compositeLayers]);
@@ -174,17 +177,18 @@ export default function Home() {
     compositeLayers();
   }, [layers, compositeLayers]);
 
-
+  // Update brush settings when tool changes
   useEffect(() => {
     const activeLayer = getActiveLayer();
     if (activeLayer) {
-      activeLayer.context.globalCompositeOperation = activeTool === 'eraser' ? 'destination-out' : 'source-over';
+      activeLayer.context.globalCompositeOperation =
+        activeTool === 'eraser' ? 'destination-out' : 'source-over';
       activeLayer.context.lineCap = 'round';
       activeLayer.context.strokeStyle = 'black';
       activeLayer.context.lineWidth = 5;
     }
   }, [activeTool, getActiveLayer]);
-  
+
   const clearSelection = () => {
     if (selectionContextRef.current && selectionCanvasRef.current) {
       selectionContextRef.current.clearRect(0, 0, selectionCanvasRef.current.width, selectionCanvasRef.current.height);
@@ -221,12 +225,16 @@ export default function Home() {
       const sourceX = Math.floor(x + sampleOffsetX - brushSize / 2);
       const sourceY = Math.floor(y + sampleOffsetY - brushSize / 2);
       
-      if (sourceX < 0 || sourceY < 0 || 
-          sourceX + brushSize > activeLayer.canvas.width || 
-          sourceY + brushSize > activeLayer.canvas.height ||
-          x - brushSize / 2 < 0 || y - brushSize / 2 < 0 ||
-          x + brushSize / 2 > activeLayer.canvas.width ||
-          y + brushSize / 2 > activeLayer.canvas.height) {
+      if (
+        sourceX < 0 ||
+        sourceY < 0 ||
+        sourceX + brushSize > activeLayer.canvas.width ||
+        sourceY + brushSize > activeLayer.canvas.height ||
+        x - brushSize / 2 < 0 ||
+        y - brushSize / 2 < 0 ||
+        x + brushSize / 2 > activeLayer.canvas.width ||
+        y + brushSize / 2 > activeLayer.canvas.height
+      ) {
         continue;
       }
       
@@ -276,14 +284,14 @@ export default function Home() {
     const activeLayer = getActiveLayer();
     
     if (activeTool === 'selection') {
-        setIsDrawing(false);
-        setSelectionStart(null);
-        return;
+      setIsDrawing(false);
+      setSelectionStart(null);
+      return;
     }
 
     if (activeTool === 'smudge') {
-        setIsDrawing(false);
-        lastSmudgePoint.current = null;
+      setIsDrawing(false);
+      lastSmudgePoint.current = null;
     }
 
     if (activeLayer) {
@@ -304,7 +312,7 @@ export default function Home() {
       const y = Math.min(offsetY, selectionStart.y);
       const width = Math.abs(offsetX - selectionStart.x);
       const height = Math.abs(offsetY - selectionStart.y);
-      setSelection({x, y, width, height});
+      setSelection({ x, y, width, height });
       drawSelection(x, y, width, height);
       return;
     }
@@ -394,12 +402,12 @@ export default function Home() {
     const newLayerContext = newLayerCanvas.getContext('2d')!;
 
     const newLayer: Layer = {
-        id: newLayerId,
-        name: `Layer ${layers.length + 1}`,
-        canvas: newLayerCanvas,
-        context: newLayerContext,
-        visible: true,
-        opacity: 1,
+      id: newLayerId,
+      name: `Layer ${layers.length + 1}`,
+      canvas: newLayerCanvas,
+      context: newLayerContext,
+      visible: true,
+      opacity: 1,
     };
     setLayers(prev => [...prev, newLayer]);
     setActiveLayerId(newLayerId);
@@ -408,100 +416,73 @@ export default function Home() {
   const deleteLayer = (layerId: string) => {
     setLayers(prev => prev.filter(l => l.id !== layerId));
     if (activeLayerId === layerId && layers.length > 1) {
-        setActiveLayerId(layers[layers.length - 2].id);
+      setActiveLayerId(layers[layers.length - 2].id);
     } else if (layers.length <= 1) {
-        setActiveLayerId(null);
+      setActiveLayerId(null);
     }
   };
 
   const toggleLayerVisibility = (layerId: string) => {
-    setLayers(prev => 
-        prev.map(l => l.id === layerId ? { ...l, visible: !l.visible } : l)
+    setLayers(prev =>
+      prev.map(l => l.id === layerId ? { ...l, visible: !l.visible } : l)
     );
   };
-
 
   return (
     <TooltipProvider delayDuration={100}>
       <div className="flex h-screen w-screen bg-background text-foreground font-body">
-        {/* Left Sidebar for tools */}
+        {/* Left Sidebar */}
         <aside className="flex flex-col items-center space-y-4 p-2 bg-card border-r z-20">
           <h1 className="text-2xl font-headline font-bold text-primary" aria-label="ArtStudio Pro">A</h1>
           <Separator />
+          {/* Tools */}
           <Tooltip>
             <TooltipTrigger asChild>
-                <Button variant={activeTool === 'brush' ? 'secondary' : 'ghost'} size="icon" onClick={() => { setActiveTool('brush'); clearSelection(); }} aria-label="Brush">
-                    <Brush className="h-6 w-6" />
-                </Button>
+              <Button variant={activeTool === 'brush' ? 'secondary' : 'ghost'} size="icon" onClick={() => { setActiveTool('brush'); clearSelection(); }}><Brush /></Button>
             </TooltipTrigger>
             <TooltipContent side="right"><p>Brush</p></TooltipContent>
           </Tooltip>
-           <Tooltip>
+          <Tooltip>
             <TooltipTrigger asChild>
-                <Button variant={activeTool === 'eraser' ? 'secondary' : 'ghost'} size="icon" onClick={() => { setActiveTool('eraser'); clearSelection(); }} aria-label="Eraser">
-                    <Eraser className="h-6 w-6" />
-                </Button>
+              <Button variant={activeTool === 'eraser' ? 'secondary' : 'ghost'} size="icon" onClick={() => { setActiveTool('eraser'); clearSelection(); }}><Eraser /></Button>
             </TooltipTrigger>
             <TooltipContent side="right"><p>Eraser</p></TooltipContent>
           </Tooltip>
-           <Tooltip>
+          <Tooltip>
             <TooltipTrigger asChild>
-                <Button variant={activeTool === 'smudge' ? 'secondary' : 'ghost'} size="icon" onClick={() => { setActiveTool('smudge'); clearSelection(); }} aria-label="Smudge Tool">
-                    <Hand className="h-6 w-6" />
-                </Button>
+              <Button variant={activeTool === 'smudge' ? 'secondary' : 'ghost'} size="icon" onClick={() => { setActiveTool('smudge'); clearSelection(); }}><Hand /></Button>
             </TooltipTrigger>
             <TooltipContent side="right"><p>Smudge</p></TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-                <Button variant={activeTool === 'selection' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('selection')} aria-label="Selection Tool">
-                    <SquareDashedMousePointer className="h-6 w-6" />
-                </Button>
+              <Button variant={activeTool === 'selection' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('selection')}><SquareDashedMousePointer /></Button>
             </TooltipTrigger>
             <TooltipContent side="right"><p>Selection</p></TooltipContent>
           </Tooltip>
           <Separator />
-
-          {/* Panel Triggers */}
-           <Sheet>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Brushes">
-                    <Brush className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Brushes</p>
-              </TooltipContent>
-            </Tooltip>
-            <SheetContent side="left" className="w-80 p-0 border-r z-50">
-              <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">Brushes</SheetTitle>
-              </SheetHeader>
-              <BrushPanel />
-            </SheetContent>
-          </Sheet>
-
+          {/* Panels */}
+          {/* Brushes */}
           <Sheet>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Layers">
-                    <Layers className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Layers</p>
-              </TooltipContent>
-            </Tooltip>
+            <SheetTrigger asChild>
+              <Tooltip>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon"><Brush /></Button></TooltipTrigger>
+                <TooltipContent side="right"><p>Brushes</p></TooltipContent>
+              </Tooltip>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50"><SheetHeader className="p-4 border-b"><SheetTitle>Brushes</SheetTitle></SheetHeader><BrushPanel /></SheetContent>
+          </Sheet>
+          {/* Layers */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Tooltip>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon"><Layers /></Button></TooltipTrigger>
+                <TooltipContent side="right"><p>Layers</p></TooltipContent>
+              </Tooltip>
+            </SheetTrigger>
             <SheetContent side="left" className="w-80 p-0 border-r z-50">
-              <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">Layers</SheetTitle>
-              </SheetHeader>
-              <LayersPanel 
+              <SheetHeader className="p-4 border-b"><SheetTitle>Layers</SheetTitle></SheetHeader>
+              <LayersPanel
                 layers={layers}
                 activeLayerId={activeLayerId}
                 onAddLayer={addLayer}
@@ -511,219 +492,110 @@ export default function Home() {
               />
             </SheetContent>
           </Sheet>
-
+          {/* Color */}
           <Sheet>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Color Palette">
-                    <Palette className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Color Palette</p>
-              </TooltipContent>
-            </Tooltip>
-            <SheetContent side="left" className="w-80 p-0 border-r z-50">
-              <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">Color Palette</SheetTitle>
-              </SheetHeader>
-              <ColorPanel />
-            </SheetContent>
+            <SheetTrigger asChild>
+              <Tooltip>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon"><Palette /></Button></TooltipTrigger>
+                <TooltipContent side="right"><p>Color Palette</p></TooltipContent>
+              </Tooltip>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50"><SheetHeader className="p-4 border-b"><SheetTitle>Color Palette</SheetTitle></SheetHeader><ColorPanel /></SheetContent>
           </Sheet>
-
+          {/* Filters */}
           <Sheet>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Filters & Effects">
-                    <Settings2 className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Filters & Effects</p>
-              </TooltipContent>
-            </Tooltip>
-            <SheetContent side="left" className="w-80 p-0 border-r z-50">
-              <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">Filters & Effects</SheetTitle>
-              </SheetHeader>
-              <FiltersPanel />
-            </SheetContent>
+            <SheetTrigger asChild>
+              <Tooltip>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon"><Settings2 /></Button></TooltipTrigger>
+                <TooltipContent side="right"><p>Filters & Effects</p></TooltipContent>
+              </Tooltip>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50"><SheetHeader className="p-4 border-b"><SheetTitle>Filters & Effects</SheetTitle></SheetHeader><FiltersPanel /></SheetContent>
           </Sheet>
-          
+          {/* AI Assistant */}
           <Sheet>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="AI Assistant">
-                    <Sparkles className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>AI Assistant</p>
-              </TooltipContent>
-            </Tooltip>
-            <SheetContent side="left" className="w-80 p-0 border-r z-50">
-              <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">AI Assistant</SheetTitle>
-              </SheetHeader>
-              <AiAssistantPanel />
-            </SheetContent>
+            <SheetTrigger asChild>
+              <Tooltip>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon"><Sparkles /></Button></TooltipTrigger>
+                <TooltipContent side="right"><p>AI Assistant</p></TooltipContent>
+              </Tooltip>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50"><SheetHeader className="p-4 border-b"><SheetTitle>AI Assistant</SheetTitle></SheetHeader><AiAssistantPanel /></SheetContent>
           </Sheet>
         </aside>
 
-        {/* Main Content */}
+        {/* Main */}
         <div className="flex flex-1 flex-col">
-          {/* Header */}
           <header className="flex h-16 items-center justify-between border-b bg-card px-6">
             <h2 className="text-xl font-headline font-semibold">{canvas ? 'My Masterpiece' : 'Untitled Canvas'}</h2>
             <div className="flex items-center gap-2">
-               <Tooltip>
-                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={handleUndo} disabled={historyIndex <= 0}>
-                        <Undo />
-                    </Button>
-                 </TooltipTrigger>
-                 <TooltipContent><p>Undo</p></TooltipContent>
-               </Tooltip>
-               <Tooltip>
-                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={handleRedo} disabled={historyIndex >= history.length - 1}>
-                        <Redo />
-                    </Button>
-                 </TooltipTrigger>
-                 <TooltipContent><p>Redo</p></TooltipContent>
-               </Tooltip>
-               <Separator orientation="vertical" className="h-8 mx-2" />
+              <Button variant="ghost" size="icon" onClick={handleUndo} disabled={historyIndex <= 0}><Undo /></Button>
+              <Button variant="ghost" size="icon" onClick={handleRedo} disabled={historyIndex >= history.length - 1}><Redo /></Button>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                   <Button variant="outline">
-                    File
-                  </Button>
-                </DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild><Button variant="outline">File</Button></DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <Dialog open={isNewCanvasDialogOpen} onOpenChange={setIsNewCanvasDialogOpen}>
-                    <DialogTrigger asChild>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        <FilePlus className="mr-2 h-4 w-4" />
-                        New Canvas
-                      </DropdownMenuItem>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Create New Canvas</DialogTitle>
-                        <DialogDescription>Set up your canvas dimensions, resolution, and color profile.</DialogDescription>
-                      </DialogHeader>
-                      <NewCanvasPanel onCreate={handleCreateCanvas} />
-                    </DialogContent>
+                    <DialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()}><FilePlus className="mr-2 h-4 w-4" /> New Canvas</DropdownMenuItem></DialogTrigger>
+                    <DialogContent><DialogHeader><DialogTitle>Create New Canvas</DialogTitle><DialogDescription>Setup canvas</DialogDescription></DialogHeader><NewCanvasPanel onCreate={handleCreateCanvas} /></DialogContent>
                   </Dialog>
-                  <DropdownMenuItem><Import className="mr-2 h-4 w-4" />Import</DropdownMenuItem>
-                  <DropdownMenuItem><Save className="mr-2 h-4 w-4" />Export</DropdownMenuItem>
+                  <DropdownMenuItem><Import className="mr-2 h-4 w-4" /> Import</DropdownMenuItem>
+                  <DropdownMenuItem><Save className="mr-2 h-4 w-4" /> Export</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </header>
 
-          {/* Canvas Area */}
           <main className="flex-1 bg-muted/50 grid place-items-center p-8 overflow-auto">
             {!canvas ? (
-               <div className="text-center text-muted-foreground">
-                  <ImageIcon className="mx-auto h-24 w-24 opacity-50" />
-                  <h3 className="mt-4 text-lg font-medium font-headline">Welcome to ArtStudio Pro</h3>
-                  <p className="mt-1 text-sm">Create a new canvas to start drawing.</p>
-                   <Dialog open={isNewCanvasDialogOpen} onOpenChange={setIsNewCanvasDialogOpen}>
-                      <DialogTrigger asChild>
-                         <Button className="mt-4">
-                          <FilePlus className="mr-2 h-4 w-4" />
-                          New Canvas
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                         <DialogHeader>
-                           <DialogTitle>Create New Canvas</DialogTitle>
-                           <DialogDescription>Set up your canvas dimensions, resolution, and color profile.</DialogDescription>
-                         </DialogHeader>
-                         <NewCanvasPanel onCreate={handleCreateCanvas} />
-                      </DialogContent>
-                    </Dialog>
+              <div className="text-center text-muted-foreground">
+                <ImageIcon className="mx-auto h-24 w-24 opacity-50" />
+                <h3 className="mt-4 text-lg font-medium font-headline">Welcome to ArtStudio Pro</h3>
+                <p className="mt-1 text-sm">Create a new canvas to start drawing.</p>
+                <Dialog open={isNewCanvasDialogOpen} onOpenChange={setIsNewCanvasDialogOpen}>
+                  <DialogTrigger asChild><Button className="mt-4"><FilePlus className="mr-2 h-4 w-4" /> New Canvas</Button></DialogTrigger>
+                  <DialogContent><DialogHeader><DialogTitle>Create New Canvas</DialogTitle><DialogDescription>Setup canvas</DialogDescription></DialogHeader><NewCanvasPanel onCreate={handleCreateCanvas} /></DialogContent>
+                </Dialog>
               </div>
             ) : (
-                <div className="relative">
-                    <canvas
-                        ref={canvasRef}
-                        className="bg-white rounded-lg shadow-2xl border-2 border-dashed"
+              <div className="relative">
+                <canvas
+                  ref={canvasRef}
+                  className="bg-white rounded-lg shadow-2xl border-2 border-dashed"
+                  onMouseDown={startDrawing}
+                  onMouseUp={finishDrawing}
+                  onMouseMove={draw}
+                  onMouseLeave={finishDrawing}
+                />
+                <canvas
+                  ref={selectionCanvasRef}
+                  className="absolute top-0 left-0 pointer-events-none z-10"
+                />
+                {selection && (
+                  <div style={{ left: selection.x, top: selection.y - 50 }} className="absolute flex items-center gap-1 bg-card p-2 rounded-md shadow-lg border z-20">
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleCopy} className="h-8 w-8"><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Copy</p></TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleCut} className="h-8 w-8"><Scissors className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Cut</p></TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handleDelete} className="h-8 w-8"><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+                    <Separator orientation="vertical" className="h-6 mx-1" />
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={handlePaste} disabled={!clipboard} className="h-8 w-8"><ClipboardPaste className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Paste</p></TooltipContent></Tooltip>
+                  </div>
+                )}
+                {activeTool === 'smudge' && (
+                  <div className="absolute -top-12 left-0 flex items-center gap-2 bg-card px-3 py-1 rounded-md shadow-sm">
+                    <label htmlFor="smudge-strength" className="text-sm">Strength:</label>
+                    <input
+                      id="smudge-strength"
+                      type="range"
+                      min="0.1"
+                      max="1"
+                      step="0.1"
+                      value={smudgeStrength}
+                      onChange={(e) => setSmudgeStrength(parseFloat(e.target.value))}
+                      className="w-24"
                     />
-                     <canvas
-                        ref={selectionCanvasRef}
-                        className="absolute top-0 left-0 pointer-events-none z-10"
-                        onMouseDown={startDrawing}
-                        onMouseUp={finishDrawing}
-                        onMouseMove={draw}
-                        onMouseLeave={finishDrawing}
-                    />
-
-                    {selection && (
-                      <div 
-                        className="absolute flex items-center gap-1 bg-card p-2 rounded-md shadow-lg border z-20"
-                        style={{ left: selection.x, top: selection.y - 50 }}
-                      >
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={handleCopy} className="h-8 w-8">
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent><p>Copy</p></TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={handleCut} className="h-8 w-8">
-                              <Scissors className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent><p>Cut</p></TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={handleDelete} className="h-8 w-8">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent><p>Delete</p></TooltipContent>
-                        </Tooltip>
-                        <Separator orientation="vertical" className="h-6 mx-1" />
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={handlePaste} disabled={!clipboard} className="h-8 w-8">
-                              <ClipboardPaste className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent><p>Paste</p></TooltipContent>
-                        </Tooltip>
-                      </div>
-                    )}
-                    
-                    {activeTool === 'smudge' && (
-                        <div className="absolute -top-12 left-0 flex items-center gap-2 bg-card px-3 py-1 rounded-md shadow-sm">
-                            <label htmlFor="smudge-strength" className="text-sm">Strength:</label>
-                            <input
-                            id="smudge-strength"
-                            type="range"
-                            min="0.1"
-                            max="1"
-                            step="0.1"
-                            value={smudgeStrength}
-                            onChange={(e) => setSmudgeStrength(parseFloat(e.target.value))}
-                            className="w-24"
-                            />
-                            <span className="text-sm text-muted-foreground">{Math.round(smudgeStrength * 100)}%</span>
-                        </div>
-                    )}
-                </div>
+                    <span className="text-sm text-muted-foreground">{Math.round(smudgeStrength * 100)}%</span>
+                  </div>
+                )}
+              </div>
             )}
           </main>
         </div>

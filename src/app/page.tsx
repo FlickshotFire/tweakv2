@@ -68,7 +68,6 @@ export default function Home() {
   const [smudgeStrength, setSmudgeStrength] = useState(0.5); // Default 50%
   const lastSmudgePoint = useRef<{ x: number, y: number } | null>(null);
 
-
   const saveState = useCallback(() => {
     if (canvasRef.current && contextRef.current) {
         const canvasData = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -313,29 +312,32 @@ export default function Home() {
             <TooltipContent side="right"><p>Selection</p></TooltipContent>
           </Tooltip>
           <Separator />
-          {panels.map(({ id, label, icon: Icon, panel: PanelComponent }) => (
-             <Sheet key={id} open={activePanel === id} onOpenChange={() => handlePanelChange(id)}>
-               <Tooltip>
-                 <TooltipTrigger asChild>
-                   <SheetTrigger asChild>
-                     <Button variant={activePanel === id ? 'secondary' : 'ghost'} size="icon" aria-label={label}>
-                       <Icon className="h-6 w-6" />
-                     </Button>
-                   </SheetTrigger>
-                 </TooltipTrigger>
-                 <TooltipContent side="right">
-                   <p>{label}</p>
-                 </TooltipContent>
-               </Tooltip>
-               <SheetContent side="left" className="w-80 p-0 border-r z-50">
-                 <SheetHeader className="p-4 border-b">
-                   <SheetTitle className="font-headline">{label}</SheetTitle>
-                 </SheetHeader>
-                 <PanelComponent />
-               </SheetContent>
-             </Sheet>
+          {panels.map(({ id, label, icon: Icon }) => (
+             <Tooltip key={id}>
+               <TooltipTrigger asChild>
+                 <Button variant={activePanel === id ? 'secondary' : 'ghost'} size="icon" aria-label={label} onClick={() => handlePanelChange(id)}>
+                   <Icon className="h-6 w-6" />
+                 </Button>
+               </TooltipTrigger>
+               <TooltipContent side="right">
+                 <p>{label}</p>
+               </TooltipContent>
+             </Tooltip>
           ))}
         </aside>
+
+        {/* Panel Content */}
+        {panels.map(({ id, label, panel: PanelComponent }) => (
+            <Sheet key={id} open={activePanel === id} onOpenChange={() => handlePanelChange(id)}>
+              <SheetContent side="left" className="w-80 p-0 border-r z-50">
+                <SheetHeader className="p-4 border-b">
+                  <SheetTitle className="font-headline">{label}</SheetTitle>
+                </SheetHeader>
+                <PanelComponent />
+              </SheetContent>
+            </Sheet>
+        ))}
+
 
         {/* Main Content */}
         <div className="flex flex-1 flex-col">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Brush,
   Layers,
@@ -11,6 +11,9 @@ import {
   ImageIcon,
   Import,
   Save,
+  Eraser,
+  Undo,
+  Redo,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -28,15 +31,37 @@ import NewCanvasPanel, { type CanvasSettings } from '@/components/panels/new-can
 import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
-type Tool = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai-assistant';
+type Panel = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai-assistant';
+type DrawingTool = 'brush' | 'eraser';
 
 export default function Home() {
-  const [activeTool, setActiveTool] = useState<Tool | null>(null);
+  const [activePanel, setActivePanel] = useState<Panel | null>(null);
+  const [activeTool, setActiveTool] = useState<DrawingTool>('brush');
   const [canvas, setCanvas] = useState<CanvasSettings | null>(null);
   const [isNewCanvasDialogOpen, setIsNewCanvasDialogOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+
+  // Undo/Redo state
+  const [history, setHistory] = useState<ImageData[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  const saveState = useCallback(() => {
+    if (canvasRef.current && contextRef.current) {
+      const canvasData = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(canvasData);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }
+  }, [history, historyIndex]);
+
+  const restoreState = useCallback(() => {
+    if (contextRef.current && historyIndex >= 0 && history[historyIndex]) {
+        contextRef.current.putImageData(history[historyIndex], 0, 0);
+    }
+  }, [history, historyIndex]);
 
   useEffect(() => {
     if (canvas && canvasRef.current) {
@@ -49,9 +74,16 @@ export default function Home() {
         context.strokeStyle = 'black';
         context.lineWidth = 5;
         contextRef.current = context;
+        saveState();
       }
     }
   }, [canvas]);
+
+  useEffect(() => {
+     if (contextRef.current) {
+        contextRef.current.globalCompositeOperation = activeTool === 'eraser' ? 'destination-out' : 'source-over';
+     }
+  }, [activeTool]);
 
   const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
     if (!contextRef.current) return;
@@ -62,9 +94,11 @@ export default function Home() {
   };
 
   const finishDrawing = () => {
-     if (!contextRef.current) return;
+    if (!isDrawing) return;
+    if (!contextRef.current) return;
     contextRef.current.closePath();
     setIsDrawing(false);
+    saveState();
   };
 
   const draw = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
@@ -73,9 +107,25 @@ export default function Home() {
     contextRef.current.lineTo(offsetX, offsetY);
     contextRef.current.stroke();
   };
+  
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      setHistoryIndex(prev => prev - 1);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex(prev => prev + 1);
+    }
+  };
+  
+  useEffect(() => {
+    restoreState();
+  }, [historyIndex, restoreState]);
 
 
-  const tools: { id: Tool; label: string; icon: React.ElementType; panel: React.ElementType }[] = [
+  const panels: { id: Panel; label: string; icon: React.ElementType; panel: React.ElementType }[] = [
     { id: 'brushes', label: 'Brushes', icon: Brush, panel: BrushPanel },
     { id: 'layers', label: 'Layers', icon: Layers, panel: LayersPanel },
     { id: 'colors', label: 'Color Palette', icon: Palette, panel: ColorPanel },
@@ -85,8 +135,11 @@ export default function Home() {
 
   const handleCreateCanvas = (settings: CanvasSettings) => {
     setCanvas(settings);
+    setHistory([]);
+    setHistoryIndex(-1);
     setIsNewCanvasDialogOpen(false);
   };
+  
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -95,25 +148,42 @@ export default function Home() {
         <aside className="flex flex-col items-center space-y-4 p-2 bg-card border-r z-10">
           <h1 className="text-2xl font-headline font-bold text-primary" aria-label="ArtStudio Pro">A</h1>
           <Separator />
-          {tools.map((tool) => (
-            <Sheet key={tool.id} onOpenChange={(open) => setActiveTool(open ? tool.id : null)}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+                <Button variant={activeTool === 'brush' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('brush')} aria-label="Brush">
+                    <Brush className="h-6 w-6" />
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Brush</p></TooltipContent>
+          </Tooltip>
+           <Tooltip>
+            <TooltipTrigger asChild>
+                <Button variant={activeTool === 'eraser' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('eraser')} aria-label="Eraser">
+                    <Eraser className="h-6 w-6" />
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Eraser</p></TooltipContent>
+          </Tooltip>
+          <Separator />
+          {panels.map((panel) => (
+            <Sheet key={panel.id} onOpenChange={(open) => setActivePanel(open ? panel.id : null)}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <SheetTrigger asChild>
-                    <Button variant={activeTool === tool.id ? 'secondary' : 'ghost'} size="icon" aria-label={tool.label}>
-                      <tool.icon className="h-6 w-6" />
+                    <Button variant={activePanel === panel.id ? 'secondary' : 'ghost'} size="icon" aria-label={panel.label}>
+                      <panel.icon className="h-6 w-6" />
                     </Button>
                   </SheetTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  <p>{tool.label}</p>
+                  <p>{panel.label}</p>
                 </TooltipContent>
               </Tooltip>
               <SheetContent side="left" className="w-80 p-0 border-r">
                 <SheetHeader className="p-4 border-b">
-                  <SheetTitle className="font-headline">{tool.label}</SheetTitle>
+                  <SheetTitle className="font-headline">{panel.label}</SheetTitle>
                 </SheetHeader>
-                <tool.panel />
+                <panel.panel />
               </SheetContent>
             </Sheet>
           ))}
@@ -125,6 +195,23 @@ export default function Home() {
           <header className="flex h-16 items-center justify-between border-b bg-card px-6">
             <h2 className="text-xl font-headline font-semibold">{canvas ? 'My Masterpiece' : 'Untitled Canvas'}</h2>
             <div className="flex items-center gap-2">
+               <Tooltip>
+                 <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={handleUndo} disabled={historyIndex <= 0}>
+                        <Undo />
+                    </Button>
+                 </TooltipTrigger>
+                 <TooltipContent><p>Undo</p></TooltipContent>
+               </Tooltip>
+               <Tooltip>
+                 <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={handleRedo} disabled={historyIndex >= history.length - 1}>
+                        <Redo />
+                    </Button>
+                 </TooltipTrigger>
+                 <TooltipContent><p>Redo</p></TooltipContent>
+               </Tooltip>
+               <Separator orientation="vertical" className="h-8 mx-2" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                    <Button variant="outline">

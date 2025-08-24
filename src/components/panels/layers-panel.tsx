@@ -6,9 +6,9 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Trash2, Eye, EyeOff } from "lucide-react";
-import Image from 'next/image';
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { SheetHeader, SheetTitle, SheetFooter } from '../ui/sheet';
 
 interface LayersPanelProps {
     layers: Layer[];
@@ -17,6 +17,7 @@ interface LayersPanelProps {
     onDeleteLayer: (id: string) => void;
     onSelectLayer: (id: string) => void;
     onToggleVisibility: (id: string) => void;
+    onSetOpacity: (id: string, opacity: number) => void;
 }
 
 function LayerThumbnail({ layer }: { layer: Layer }) {
@@ -26,20 +27,24 @@ function LayerThumbnail({ layer }: { layer: Layer }) {
         if (canvasRef.current) {
             const ctx = canvasRef.current.getContext('2d');
             if (ctx) {
-                // Scale down the layer canvas to fit the thumbnail
-                const scale = Math.min(40 / layer.canvas.width, 40 / layer.canvas.height);
+                const previewSize = 48;
+                canvasRef.current.width = previewSize;
+                canvasRef.current.height = previewSize;
+
+                const scale = Math.min(previewSize / layer.canvas.width, previewSize / layer.canvas.height);
                 const width = layer.canvas.width * scale;
                 const height = layer.canvas.height * scale;
-                const x = (40 - width) / 2;
-                const y = (40 - height) / 2;
+                const x = (previewSize - width) / 2;
+                const y = (previewSize - height) / 2;
                 
-                ctx.clearRect(0, 0, 40, 40);
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0,0, previewSize, previewSize);
                 ctx.drawImage(layer.canvas, x, y, width, height);
             }
         }
-    }, [layer.canvas, layer.id]); // Redraw when layer canvas changes
+    }, [layer.canvas.toDataURL(), layer.visible, layer.opacity]); // Redraw when layer canvas changes
 
-    return <canvas ref={canvasRef} width={40} height={40} className="bg-white rounded-sm" />;
+    return <canvas ref={canvasRef} className="bg-transparent rounded-md border border-gray-600" />;
 }
 
 
@@ -49,38 +54,51 @@ export default function LayersPanel({
     onAddLayer,
     onDeleteLayer,
     onSelectLayer,
-    onToggleVisibility
+    onToggleVisibility,
+    onSetOpacity
 }: LayersPanelProps) {
+  const activeLayer = layers.find(l => l.id === activeLayerId);
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 flex items-center justify-between">
-        <Label htmlFor="layer-opacity">Opacity</Label>
-        <Slider id="layer-opacity" defaultValue={[100]} max={100} step={1} className="w-40" />
-      </div>
-      <ScrollArea className="flex-1 border-y">
+    <div className="flex flex-col h-full bg-gray-800 text-white">
+      <SheetHeader className="p-4 border-b border-gray-700">
+        <SheetTitle className="font-headline text-white">Layers</SheetTitle>
+      </SheetHeader>
+       {activeLayer && (
+        <div className="p-4 border-b border-gray-700 space-y-3">
+          <Label htmlFor="layer-opacity" className="text-sm font-medium text-gray-400">Opacity</Label>
+          <Slider 
+            id="layer-opacity" 
+            value={[activeLayer.opacity * 100]} 
+            onValueChange={(value) => onSetOpacity(activeLayer.id, value[0]/100)}
+            max={100} 
+            step={1} 
+          />
+        </div>
+       )}
+      <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
           {layers.map((layer) => (
             <div 
               key={layer.id} 
               className={cn(
-                "flex items-center justify-between p-2 rounded-md hover:bg-secondary group cursor-pointer",
-                layer.id === activeLayerId && 'bg-secondary'
+                "flex items-center justify-between p-2 rounded-md hover:bg-gray-700/50 group cursor-pointer",
+                layer.id === activeLayerId && 'bg-blue-500/20 hover:bg-blue-500/30'
               )}
               onClick={() => onSelectLayer(layer.id)}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white rounded-md overflow-hidden border">
+                <div className="w-12 h-12 bg-gray-700 rounded-md overflow-hidden border-2 border-transparent group-hover:border-gray-500 transition-colors">
                   <LayerThumbnail layer={layer} />
                 </div>
                 <p className="font-medium text-sm">{layer.name}</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                  <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-7 w-7"
+                    className="h-8 w-8 text-gray-400 hover:text-white hover:bg-gray-700"
                     onClick={(e) => {
-                        e.stopPropagation(); // Prevent layer selection
+                        e.stopPropagation();
                         onToggleVisibility(layer.id)
                     }}
                  >
@@ -91,17 +109,20 @@ export default function LayersPanel({
           ))}
         </div>
       </ScrollArea>
-      <div className="p-2 flex justify-end gap-2">
-        <Button variant="ghost" size="icon" onClick={onAddLayer}><Plus className="w-5 h-5" /></Button>
+      <SheetFooter className="p-2 flex justify-end gap-2 bg-gray-800 border-t border-gray-700">
+        <Button variant="ghost" size="icon" onClick={onAddLayer} className="text-gray-400 hover:text-white hover:bg-gray-700"><Plus className="w-5 h-5" /></Button>
         <Button 
             variant="ghost" 
             size="icon" 
             disabled={!activeLayerId || layers.length <= 1}
             onClick={() => activeLayerId && onDeleteLayer(activeLayerId)}
+            className="text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-50"
         >
             <Trash2 className="w-5 h-5" />
         </Button>
-      </div>
+      </SheetFooter>
     </div>
   );
 }
+
+    

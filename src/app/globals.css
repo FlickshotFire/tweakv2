@@ -4,48 +4,35 @@
 
 @layer base {
   :root {
-    --background: 240 67% 94%;
-    --foreground: 275 100% 10%;
-    --card: 240 67% 97%;
-    --card-foreground: 275 100% 10%;
-    --popover: 240 67% 97%;
-    --popover-foreground: 275 100% 10%;
-    --primary: 275 100% 25%;
-    --primary-foreground: 240 67% 98%;
-    --secondary: 271 76% 90%;
-    --secondary-foreground: 275 100% 10%;
-    --muted: 240 20% 85%;
-    --muted-foreground: 240 5% 45%;
-    --accent: 271 76% 54%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 275 20% 80%;
-    --input: 275 20% 88%;
-    --ring: 271 76% 54%;
-    --radius: 0.5rem;
-  }
+    --background: 224 71% 4%; /* Equivalent to #0A0F1A */
+    --foreground: 215 28% 93%; /* Equivalent to #E8EAED */
+    
+    --card: 222 84% 5%; /* Equivalent to #0D1117 */
+    --card-foreground: 215 28% 93%;
 
-  .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 8%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 4%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 271 76% 65%;
-    --primary-foreground: 275 100% 10%;
-    --secondary: 240 10% 12%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 10% 12%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 271 76% 54%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 10% 15%;
-    --input: 240 10% 15%;
-    --ring: 271 76% 54%;
+    --popover: 222 84% 5%;
+    --popover-foreground: 215 28% 93%;
+
+    --primary: 217 91% 60%; /* Equivalent to #3B82F6 */
+    --primary-foreground: 215 28% 93%;
+
+    --secondary: 220 14% 20%; /* Equivalent to #2A2F3B */
+    --secondary-foreground: 215 28% 93%;
+
+    --muted: 220 14% 20%;
+    --muted-foreground: 215 14% 65%; /* Equivalent to #98A0AC */
+    
+    --accent: 217 91% 60%; /* #3B82F6 */
+    --accent-foreground: 215 28% 93%;
+
+    --destructive: 0 72% 51%; /* #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 217 19% 27%; /* #38425A */
+    --input: 217 19% 27%;
+    --ring: 217 91% 60%; /* #3B82F6 */
+    
+    --radius: 0.75rem;
   }
 }
 
@@ -57,3 +44,5 @@
     @apply bg-background text-foreground;
   }
 }
+
+    

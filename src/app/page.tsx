@@ -25,7 +25,8 @@ import LayersPanel from '@/components/panels/layers-panel';
 import ColorPanel from '@/components/panels/color-panel';
 import FiltersPanel from '@/components/panels/filters-panel';
 import NewCanvasPanel from '@/components/panels/new-canvas-panel';
-import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 type Tool = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai-assistant';
 
@@ -92,6 +93,9 @@ export default function Home() {
                       </DropdownMenuItem>
                     </DialogTrigger>
                     <DialogContent>
+                      <DialogTitle asChild>
+                        <VisuallyHidden>New Canvas</VisuallyHidden>
+                      </DialogTitle>
                       <NewCanvasPanel />
                     </DialogContent>
                   </Dialog>
@@ -117,6 +121,9 @@ export default function Home() {
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
+                           <DialogTitle asChild>
+                             <VisuallyHidden>New Canvas</VisuallyHidden>
+                           </DialogTitle>
                            <NewCanvasPanel />
                         </DialogContent>
                       </Dialog>

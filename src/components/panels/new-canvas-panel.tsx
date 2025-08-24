@@ -6,12 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FilePlus } from "lucide-react";
+import { DialogTitle } from "@/components/ui/dialog";
 
 export default function NewCanvasPanel() {
   return (
     <Card className="border-0 shadow-none">
       <CardHeader>
-        <CardTitle className="font-headline text-2xl">Create New Canvas</CardTitle>
+        <DialogTitle asChild>
+          <CardTitle className="font-headline text-2xl">Create New Canvas</CardTitle>
+        </DialogTitle>
         <CardDescription>Set up your canvas dimensions, resolution, and color profile.</CardDescription>
       </CardHeader>
       <CardContent>

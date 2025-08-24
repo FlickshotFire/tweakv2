@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -33,6 +33,8 @@ import NewCanvasPanel, { type CanvasSettings } from '@/components/panels/new-can
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
+
+type PanelId = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai';
 type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge';
 const MAX_HISTORY_SIZE = 30;
 
@@ -45,6 +47,7 @@ export default function Home() {
   const selectionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const selectionContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [activePanel, setActivePanel] = useState<PanelId | null>(null);
 
   // Undo/Redo state
   const [history, setHistory] = useState<ImageData[]>([]);
@@ -60,25 +63,32 @@ export default function Home() {
 
   const saveState = useCallback(() => {
     if (canvasRef.current && contextRef.current) {
-        const canvasData = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-        const newHistory = history.slice(0, historyIndex + 1);
+      const canvasData = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+      
+      setHistory(prevHistory => {
+        const newHistory = prevHistory.slice(0, historyIndex + 1);
         newHistory.push(canvasData);
-
+        
         // Limit history size
         if (newHistory.length > MAX_HISTORY_SIZE) {
-            newHistory.shift();
+          newHistory.shift();
         }
-
-        setHistory(newHistory);
-        setHistoryIndex(newHistory.length - 1);
+        
+        return newHistory;
+      });
+      
+      setHistoryIndex(prev => {
+        const newHistory = history.slice(0, prev + 1);
+        return newHistory.length >= MAX_HISTORY_SIZE ? prev : prev + 1;
+      });
     }
-  }, [history, historyIndex]);
+  }, [historyIndex, history]);
 
-  const restoreState = useCallback(() => {
-    if (contextRef.current && historyIndex >= 0 && history[historyIndex]) {
-        contextRef.current.putImageData(history[historyIndex], 0, 0);
+  const restoreState = useCallback((index: number) => {
+    if (contextRef.current && index >= 0 && index < history.length && history[index]) {
+      contextRef.current.putImageData(history[index], 0, 0);
     }
-  }, [history, historyIndex]);
+  }, [history]);
 
   useEffect(() => {
     if (canvas && canvasRef.current && selectionCanvasRef.current) {
@@ -100,7 +110,11 @@ export default function Home() {
         // Initial blank state
         context.fillStyle = 'white';
         context.fillRect(0, 0, canvas.width, canvas.height);
-        saveState();
+        
+        // Save initial state
+        const initialData = context.getImageData(0, 0, canvas.width, canvas.height);
+        setHistory([initialData]);
+        setHistoryIndex(0);
       }
 
       const selectionContext = selectionCanvasEl.getContext('2d');
@@ -111,17 +125,17 @@ export default function Home() {
         selectionContextRef.current = selectionContext;
       }
     }
-  }, [canvas, saveState]);
+  }, [canvas]);
 
   useEffect(() => {
-     if (contextRef.current) {
-        contextRef.current.globalCompositeOperation = activeTool === 'eraser' ? 'destination-out' : 'source-over';
-     }
+    if (contextRef.current) {
+      contextRef.current.globalCompositeOperation = activeTool === 'eraser' ? 'destination-out' : 'source-over';
+    }
   }, [activeTool]);
 
   const clearSelection = () => {
     if (selectionContextRef.current && selectionCanvasRef.current) {
-        selectionContextRef.current.clearRect(0, 0, selectionCanvasRef.current.width, selectionCanvasRef.current.height);
+      selectionContextRef.current.clearRect(0, 0, selectionCanvasRef.current.width, selectionCanvasRef.current.height);
     }
   }
 
@@ -131,6 +145,64 @@ export default function Home() {
       selectionContextRef.current.strokeRect(x, y, width, height);
     }
   }
+
+  const smudge = (currentX: number, currentY: number) => {
+    if (!contextRef.current || !canvasRef.current || !lastSmudgePoint.current) return;
+
+    const ctx = contextRef.current;
+    const brushSize = Math.max(ctx.lineWidth * 2, 10);
+    const lastX = lastSmudgePoint.current.x;
+    const lastY = lastSmudgePoint.current.y;
+    
+    const dist = Math.hypot(currentX - lastX, currentY - lastY);
+    const angle = Math.atan2(currentY - lastY, currentX - lastX);
+
+    // Sample from behind the brush movement
+    const sampleOffsetX = -Math.cos(angle) * brushSize * 0.5;
+    const sampleOffsetY = -Math.sin(angle) * brushSize * 0.5;
+
+    for (let i = 0; i < dist; i += 2) {
+      const x = lastX + Math.cos(angle) * i;
+      const y = lastY + Math.sin(angle) * i;
+
+      // Sample from a point behind the current position
+      const sourceX = Math.floor(x + sampleOffsetX - brushSize / 2);
+      const sourceY = Math.floor(y + sampleOffsetY - brushSize / 2);
+
+      // Ensure we're within canvas bounds
+      if (sourceX < 0 || sourceY < 0 || 
+          sourceX + brushSize > canvasRef.current.width || 
+          sourceY + brushSize > canvasRef.current.height ||
+          x - brushSize / 2 < 0 || y - brushSize / 2 < 0 ||
+          x + brushSize / 2 > canvasRef.current.width ||
+          y + brushSize / 2 > canvasRef.current.height) {
+        continue;
+      }
+
+      // Get the image data from the source position
+      const imageData = ctx.getImageData(sourceX, sourceY, brushSize, brushSize);
+      
+      // Create a temporary canvas for blending
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = brushSize;
+      tempCanvas.height = brushSize;
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      if (tempCtx) {
+        // Put the sampled data on temp canvas
+        tempCtx.putImageData(imageData, 0, 0);
+        
+        // Draw with blending on main canvas
+        ctx.save();
+        ctx.globalAlpha = smudgeStrength * 0.3;
+        ctx.drawImage(tempCanvas, x - brushSize / 2, y - brushSize / 2);
+        ctx.restore();
+      }
+    }
+    
+    lastSmudgePoint.current = { x: currentX, y: currentY };
+  };
+
 
   const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
     const { offsetX, offsetY } = nativeEvent;
@@ -176,38 +248,6 @@ export default function Home() {
     }
   };
 
-  const smudge = (currentX: number, currentY: number) => {
-    if (!contextRef.current || !canvasRef.current || !lastSmudgePoint.current) return;
-
-    const ctx = contextRef.current;
-    const brushSize = ctx.lineWidth;
-    const lastX = lastSmudgePoint.current.x;
-    const lastY = lastSmudgePoint.current.y;
-    
-    const dist = Math.hypot(currentX - lastX, currentY - lastY);
-    const angle = Math.atan2(currentY - lastY, currentX - lastX);
-
-    for (let i = 0; i < dist; i += 1) {
-        const x = lastX + Math.cos(angle) * i;
-        const y = lastY + Math.sin(angle) * i;
-
-        const sourceX = Math.floor(x - brushSize / 2);
-        const sourceY = Math.floor(y - brushSize / 2);
-
-        if (sourceX < 0 || sourceY < 0 || sourceX + brushSize > canvasRef.current.width || sourceY + brushSize > canvasRef.current.height) {
-            continue;
-        }
-
-        const imageData = ctx.getImageData(sourceX, sourceY, brushSize, brushSize);
-        
-        ctx.globalAlpha = smudgeStrength * 0.1; // Lower alpha for blending
-        ctx.putImageData(imageData, sourceX + Math.cos(angle), sourceY + Math.sin(angle));
-        ctx.globalAlpha = 1.0; // Reset alpha
-    }
-    lastSmudgePoint.current = { x: currentX, y: currentY };
-  }
-
-
   const draw = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
     const { offsetX, offsetY } = nativeEvent;
@@ -235,18 +275,24 @@ export default function Home() {
   
   const handleUndo = () => {
     if (historyIndex > 0) {
-      setHistoryIndex(prev => prev - 1);
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      restoreState(newIndex);
     }
   };
 
   const handleRedo = () => {
     if (historyIndex < history.length - 1) {
-      setHistoryIndex(prev => prev + 1);
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      restoreState(newIndex);
     }
   };
-  
+
   useEffect(() => {
-    restoreState();
+    if(historyIndex > -1) {
+        restoreState(historyIndex);
+    }
   }, [historyIndex, restoreState]);
 
   const handleCreateCanvas = (settings: CanvasSettings) => {
@@ -257,7 +303,45 @@ export default function Home() {
     setSelection(null);
     clearSelection();
   };
+
+  const handlePanelChange = (panelId: PanelId) => {
+    setActivePanel((current) => (current === panelId ? null : panelId));
+  };
   
+  const renderPanelContent = () => {
+    switch(activePanel) {
+      case 'brushes':
+        return <BrushPanel />;
+      case 'layers':
+        return <LayersPanel />;
+      case 'colors':
+        return <ColorPanel />;
+      case 'filters':
+        return <FiltersPanel />;
+      case 'ai':
+        return <AiAssistantPanel />;
+      default:
+        return null;
+    }
+  };
+
+  const getPanelTitle = () => {
+     switch(activePanel) {
+      case 'brushes':
+        return 'Brushes';
+      case 'layers':
+        return 'Layers';
+      case 'colors':
+        return 'Color Palette';
+      case 'filters':
+        return 'Filters & Effects';
+      case 'ai':
+        return 'AI Assistant';
+      default:
+        return '';
+    }
+  }
+
   return (
     <TooltipProvider delayDuration={100}>
       <div className="flex h-screen w-screen bg-background text-foreground font-body">
@@ -300,101 +384,61 @@ export default function Home() {
           <Separator />
 
           {/* Panel Triggers */}
-          <Sheet>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SheetTrigger asChild>
-                  <Button variant='ghost' size="icon" aria-label="Brushes">
-                    <Brush className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right"><p>Brushes</p></TooltipContent>
-            </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant='ghost' size="icon" aria-label="Brushes" onClick={() => handlePanelChange('brushes')}>
+                <Brush className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Brushes</p></TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant='ghost' size="icon" aria-label="Layers" onClick={() => handlePanelChange('layers')}>
+                <Layers className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Layers</p></TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant='ghost' size="icon" aria-label="Color Palette" onClick={() => handlePanelChange('colors')}>
+                <Palette className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Color Palette</p></TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant='ghost' size="icon" aria-label="Filters & Effects" onClick={() => handlePanelChange('filters')}>
+                <Settings2 className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Filters & Effects</p></TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant='ghost' size="icon" aria-label="AI Assistant" onClick={() => handlePanelChange('ai')}>
+                <Sparkles className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>AI Assistant</p></TooltipContent>
+          </Tooltip>
+        </aside>
+
+        <Sheet open={!!activePanel} onOpenChange={(open) => !open && setActivePanel(null)}>
             <SheetContent side="left" className="w-80 p-0 border-r z-50">
               <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">Brushes</SheetTitle>
+                <SheetTitle className="font-headline">{getPanelTitle()}</SheetTitle>
               </SheetHeader>
-              <BrushPanel />
+              {renderPanelContent()}
             </SheetContent>
-          </Sheet>
+        </Sheet>
 
-          <Sheet>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SheetTrigger asChild>
-                  <Button variant='ghost' size="icon" aria-label="Layers">
-                    <Layers className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right"><p>Layers</p></TooltipContent>
-            </Tooltip>
-            <SheetContent side="left" className="w-80 p-0 border-r z-50">
-                <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">Layers</SheetTitle>
-                </SheetHeader>
-                <LayersPanel />
-            </SheetContent>
-          </Sheet>
-
-          <Sheet>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SheetTrigger asChild>
-                  <Button variant='ghost' size="icon" aria-label="Color Palette">
-                    <Palette className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right"><p>Color Palette</p></TooltipContent>
-            </Tooltip>
-            <SheetContent side="left" className="w-80 p-0 border-r z-50">
-                <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">Color Palette</SheetTitle>
-                </SheetHeader>
-                <ColorPanel />
-            </SheetContent>
-          </Sheet>
-          
-          <Sheet>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SheetTrigger asChild>
-                  <Button variant='ghost' size="icon" aria-label="Filters & Effects">
-                    <Settings2 className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right"><p>Filters & Effects</p></TooltipContent>
-            </Tooltip>
-            <SheetContent side="left" className="w-80 p-0 border-r z-50">
-                <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">Filters & Effects</SheetTitle>
-                </SheetHeader>
-                <FiltersPanel />
-            </SheetContent>
-          </Sheet>
-
-          <Sheet>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SheetTrigger asChild>
-                  <Button variant='ghost' size="icon" aria-label="AI Assistant">
-                    <Sparkles className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right"><p>AI Assistant</p></TooltipContent>
-            </Tooltip>
-            <SheetContent side="left" className="w-80 p-0 border-r z-50">
-                <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">AI Assistant</SheetTitle>
-                </SheetHeader>
-                <AiAssistantPanel />
-            </SheetContent>
-          </Sheet>
-        </aside>
 
         {/* Main Content */}
         <div className="flex flex-1 flex-col">
@@ -485,6 +529,22 @@ export default function Home() {
                         ref={selectionCanvasRef}
                         className="absolute top-0 left-0 pointer-events-none z-10"
                     />
+                    {activeTool === 'smudge' && (
+                        <div className="absolute -top-12 left-0 flex items-center gap-2 bg-card px-3 py-1 rounded-md shadow-sm">
+                            <label htmlFor="smudge-strength" className="text-sm">Strength:</label>
+                            <input
+                            id="smudge-strength"
+                            type="range"
+                            min="0.1"
+                            max="1"
+                            step="0.1"
+                            value={smudgeStrength}
+                            onChange={(e) => setSmudgeStrength(parseFloat(e.target.value))}
+                            className="w-24"
+                            />
+                            <span className="text-sm text-muted-foreground">{Math.round(smudgeStrength * 100)}%</span>
+                        </div>
+                    )}
                 </div>
             )}
           </main>

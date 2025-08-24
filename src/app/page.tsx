@@ -43,7 +43,7 @@ import FiltersPanel from '@/components/panels/filters-panel';
 import NewCanvasPanel, { type CanvasSettings } from '@/components/panels/new-canvas-panel';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
-type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge';
+type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge' | 'pan';
 const MAX_HISTORY_SIZE = 30;
 
 export interface Layer {
@@ -68,7 +68,11 @@ function ArtStudioPro() {
   // Layer state
   const [layers, setLayers] = useState<Layer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
+  
+  // Pan and Zoom
   const [canvasZoom, setCanvasZoom] = useState(100);
+  const [canvasPosition, setCanvasPosition] = useState({ x: 0, y: 0 });
+  const panStartRef = useRef<{ x: number, y: number } | null>(null);
 
   const getActiveLayer = useCallback(() => {
     return layers.find(l => l.id === activeLayerId) || null;
@@ -272,9 +276,9 @@ function ArtStudioPro() {
     compositeLayers();
   };
 
-  const getCanvasCoordinates = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvasEl = selectionCanvasRef.current;
-    if (!canvasEl) return { offsetX: 0, offsetY: 0};
+  const getCanvasCoordinates = (event: React.MouseEvent<HTMLDivElement> | MouseEvent) => {
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return { offsetX: 0, offsetY: 0 };
     
     const rect = canvasEl.getBoundingClientRect();
     const scale = canvasZoom / 100;
@@ -285,11 +289,17 @@ function ArtStudioPro() {
     }
   }
 
-  const startDrawing = (event: React.MouseEvent<HTMLCanvasElement>) => {
+  const startDrawing = (event: React.MouseEvent<HTMLDivElement>) => {
     const { offsetX, offsetY } = getCanvasCoordinates(event);
     const activeLayer = getActiveLayer();
     if (!activeLayer) return;
 
+    if (activeTool === 'pan') {
+      panStartRef.current = { x: event.clientX - canvasPosition.x, y: event.clientY - canvasPosition.y };
+      setIsDrawing(true);
+      return;
+    }
+    
     if (activeTool === 'selection') {
       setIsDrawing(true);
       setSelectionStart({ x: offsetX, y: offsetY });
@@ -310,6 +320,12 @@ function ArtStudioPro() {
   const finishDrawing = () => {
     if (!isDrawing) return;
     const activeLayer = getActiveLayer();
+
+    if (activeTool === 'pan') {
+        panStartRef.current = null;
+        setIsDrawing(false);
+        return;
+    }
     
     if (activeTool === 'selection') {
       setIsDrawing(false);
@@ -329,10 +345,19 @@ function ArtStudioPro() {
     setIsDrawing(false);
   };
 
-  const draw = (event: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isDrawing) return;
     const { offsetX, offsetY } = getCanvasCoordinates(event);
     const activeLayer = getActiveLayer();
+
+    if(activeTool === 'pan') {
+        if(panStartRef.current) {
+            const x = event.clientX - panStartRef.current.x;
+            const y = event.clientY - panStartRef.current.y;
+            setCanvasPosition({ x, y });
+        }
+        return;
+    }
 
     if (activeTool === 'selection') {
       if (!selectionStart) return;
@@ -480,7 +505,12 @@ function ArtStudioPro() {
 
   return (
     <TooltipProvider delayDuration={200}>
-        <div className="h-screen w-screen bg-grid-pattern bg-background text-gray-200 font-sans flex flex-col p-4 gap-4">
+        <div 
+          className="h-screen w-screen bg-grid-pattern bg-background text-gray-200 font-sans flex flex-col p-4 gap-4"
+          onMouseMove={draw}
+          onMouseUp={finishDrawing}
+          onMouseLeave={finishDrawing}
+        >
             {/* Top Bar */}
             <header className="flex justify-between items-center bg-card h-16 px-4 rounded-xl shadow-lg">
                 {/* Left Tools */}
@@ -509,9 +539,9 @@ function ArtStudioPro() {
                     </Tooltip>
                      <Tooltip>
                         <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Hand className="w-5 h-5" /></Button>
+                           <Button variant={activeTool === 'pan' ? 'secondary' : 'ghost'} size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white" onClick={() => setActiveTool('pan')}><Hand className="w-5 h-5" /></Button>
                         </TooltipTrigger>
-                        <TooltipContent><p>Transform</p></TooltipContent>
+                        <TooltipContent><p>Pan/Move</p></TooltipContent>
                     </Tooltip>
                 </div>
                  {/* Center dots - purely decorative */}
@@ -626,10 +656,16 @@ function ArtStudioPro() {
                 </aside>
 
                 {/* Canvas Area */}
-                <div className="flex-1 bg-black/20 rounded-xl shadow-inner grid place-items-center relative overflow-auto">
+                <div 
+                  className="flex-1 bg-black/20 rounded-xl shadow-inner grid place-items-center relative overflow-hidden"
+                  onMouseDown={startDrawing}
+                >
                     <div 
                       className="relative shadow-2xl transition-transform duration-200"
-                      style={{ transform: `scale(${canvasZoom / 100})` }}
+                      style={{ 
+                        transform: `scale(${canvasZoom / 100}) translate(${canvasPosition.x}px, ${canvasPosition.y}px)`,
+                        cursor: activeTool === 'pan' ? 'grab' : 'default'
+                      }}
                     >
                         <canvas
                             ref={canvasRef}
@@ -638,10 +674,7 @@ function ArtStudioPro() {
                         <canvas
                             ref={selectionCanvasRef}
                             className="absolute top-0 left-0"
-                            onMouseDown={startDrawing}
-                            onMouseUp={finishDrawing}
-                            onMouseMove={draw}
-                            onMouseLeave={finishDrawing}
+                            style={{ pointerEvents: activeTool === 'selection' ? 'auto' : 'none' }}
                         />
                         {selection && selection.width > 0 && selection.height > 0 && (
                           <div style={{ left: selection.x, top: Math.max(0, selection.y - 50) }} className="absolute flex gap-1 bg-card p-2 rounded-md shadow-lg border border-border z-20">

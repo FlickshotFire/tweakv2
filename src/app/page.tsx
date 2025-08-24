@@ -260,8 +260,14 @@ export default function Home() {
     clearSelection();
   };
 
-  const handlePanelChange = (panelId: Panel | null) => {
+  const handlePanelChange = (panelId: Panel) => {
     setActivePanel(prev => (prev === panelId ? null : panelId));
+  };
+  
+  const handleSheetOpenChange = (open: boolean) => {
+    if (!open) {
+      setActivePanel(null);
+    }
   };
   
   return (
@@ -347,45 +353,45 @@ export default function Home() {
         </aside>
 
         {/* Panel Content */}
-        <Sheet open={activePanel === 'brushes'} onOpenChange={(open) => !open && handlePanelChange(null)}>
-          <SheetContent side="left" className="w-80 p-0 border-r z-50">
-            <SheetHeader className="p-4 border-b">
-              <SheetTitle className="font-headline">Brushes</SheetTitle>
-            </SheetHeader>
-            <BrushPanel />
-          </SheetContent>
+        <Sheet open={activePanel === 'brushes'} onOpenChange={handleSheetOpenChange}>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50">
+                <SheetHeader className="p-4 border-b">
+                <SheetTitle className="font-headline">Brushes</SheetTitle>
+                </SheetHeader>
+                <BrushPanel />
+            </SheetContent>
         </Sheet>
-        <Sheet open={activePanel === 'layers'} onOpenChange={(open) => !open && handlePanelChange(null)}>
-          <SheetContent side="left" className="w-80 p-0 border-r z-50">
-            <SheetHeader className="p-4 border-b">
-              <SheetTitle className="font-headline">Layers</SheetTitle>
-            </SheetHeader>
-            <LayersPanel />
-          </SheetContent>
+        <Sheet open={activePanel === 'layers'} onOpenChange={handleSheetOpenChange}>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50">
+                <SheetHeader className="p-4 border-b">
+                <SheetTitle className="font-headline">Layers</SheetTitle>
+                </SheetHeader>
+                <LayersPanel />
+            </SheetContent>
         </Sheet>
-        <Sheet open={activePanel === 'colors'} onOpenChange={(open) => !open && handlePanelChange(null)}>
-          <SheetContent side="left" className="w-80 p-0 border-r z-50">
-            <SheetHeader className="p-4 border-b">
-              <SheetTitle className="font-headline">Color Palette</SheetTitle>
-            </SheetHeader>
-            <ColorPanel />
-          </SheetContent>
+        <Sheet open={activePanel === 'colors'} onOpenChange={handleSheetOpenChange}>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50">
+                <SheetHeader className="p-4 border-b">
+                <SheetTitle className="font-headline">Color Palette</SheetTitle>
+                </SheetHeader>
+                <ColorPanel />
+            </SheetContent>
         </Sheet>
-        <Sheet open={activePanel === 'filters'} onOpenChange={(open) => !open && handlePanelChange(null)}>
-          <SheetContent side="left" className="w-80 p-0 border-r z-50">
-            <SheetHeader className="p-4 border-b">
-              <SheetTitle className="font-headline">Filters & Effects</SheetTitle>
-            </SheetHeader>
-            <FiltersPanel />
-          </SheetContent>
+        <Sheet open={activePanel === 'filters'} onOpenChange={handleSheetOpenChange}>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50">
+                <SheetHeader className="p-4 border-b">
+                <SheetTitle className="font-headline">Filters & Effects</SheetTitle>
+                </SheetHeader>
+                <FiltersPanel />
+            </SheetContent>
         </Sheet>
-        <Sheet open={activePanel === 'ai-assistant'} onOpenChange={(open) => !open && handlePanelChange(null)}>
-          <SheetContent side="left" className="w-80 p-0 border-r z-50">
-            <SheetHeader className="p-4 border-b">
-              <SheetTitle className="font-headline">AI Assistant</SheetTitle>
-            </SheetHeader>
-            <AiAssistantPanel />
-          </SheetContent>
+        <Sheet open={activePanel === 'ai-assistant'} onOpenChange={handleSheetOpenChange}>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50">
+                <SheetHeader className="p-4 border-b">
+                <SheetTitle className="font-headline">AI Assistant</SheetTitle>
+                </SheetHeader>
+                <AiAssistantPanel />
+            </SheetContent>
         </Sheet>
 
         {/* Main Content */}

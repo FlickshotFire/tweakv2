@@ -20,7 +20,6 @@ import {
   Scissors,
   Trash2,
   ClipboardPaste,
-  Wrench,
   ChevronLeft,
   ZoomIn,
   ZoomOut,
@@ -575,12 +574,6 @@ function ArtStudioPro() {
                       <ChevronLeft className="mr-2 h-4 w-4" /> Gallery
                     </Button>
                     <Separator orientation="vertical" className="h-8 bg-border" />
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Wrench className="w-5 h-5" /></Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Actions</p></TooltipContent>
-                    </Tooltip>
                     <DropdownMenu>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -782,5 +775,3 @@ function ArtStudioPro() {
 }
 
 export default ArtStudioPro;
-
-    

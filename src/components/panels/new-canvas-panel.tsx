@@ -41,7 +41,7 @@ export default function NewCanvasPanel({ onCreate }: NewCanvasPanelProps) {
   }
 
   return (
-    <Card className="border-0 shadow-none">
+    <Card className="border-0 shadow-none bg-transparent">
       <CardContent className="pt-6">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -118,3 +118,4 @@ export default function NewCanvasPanel({ onCreate }: NewCanvasPanelProps) {
     </Card>
   );
 }
+ 

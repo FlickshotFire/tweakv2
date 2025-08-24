@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Pen, Pencil, Paintbrush } from "lucide-react";
+import { SheetHeader, SheetTitle } from "../ui/sheet";
 
 const brushes = [
   { name: 'Technical Pen', family: 'Inking', icon: Pen },
@@ -18,23 +19,16 @@ const brushes = [
 
 export default function BrushPanel() {
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 space-y-4">
-        <div>
-          <Label htmlFor="brush-size" className="mb-2 block">Brush Size</Label>
-          <Slider id="brush-size" defaultValue={[50]} max={100} step={1} />
-        </div>
-        <div>
-          <Label htmlFor="brush-opacity" className="mb-2 block">Opacity</Label>
-          <Slider id="brush-opacity" defaultValue={[80]} max={100} step={1} />
-        </div>
-      </div>
-      <Separator />
+    <div className="flex flex-col h-full bg-card text-white">
+      <SheetHeader className="p-4 border-b border-border">
+        <SheetTitle className="font-headline text-white">Brushes</SheetTitle>
+      </SheetHeader>
+      <Separator className="bg-border" />
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-2">
-          <h3 className="font-semibold text-sm font-headline">Brush Library</h3>
+          {/* Brush library items */}
           {brushes.map((brush, index) => (
-            <button key={index} className="w-full text-left p-2 rounded-md hover:bg-secondary flex items-center gap-3">
+            <button key={index} className="w-full text-left p-2 rounded-md hover:bg-accent/10 flex items-center gap-3">
               <brush.icon className="w-5 h-5 text-accent" />
               <div>
                 <p className="font-medium text-sm">{brush.name}</p>
@@ -47,3 +41,4 @@ export default function BrushPanel() {
     </div>
   );
 }
+ 

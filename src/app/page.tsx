@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Brush,
   Layers,
@@ -464,43 +464,45 @@ function ArtStudioPro() {
 
   return (
     <TooltipProvider delayDuration={200}>
-        <div className="h-screen w-screen bg-grid-gray-800/20 text-gray-200 font-sans flex flex-col p-4 gap-4">
+        <div className="h-screen w-screen bg-grid-pattern bg-background text-gray-200 font-sans flex flex-col p-4 gap-4">
             {/* Top Bar */}
-            <header className="flex justify-between items-center bg-gray-800 h-16 px-4 rounded-xl shadow-lg">
+            <header className="flex justify-between items-center bg-card h-16 px-4 rounded-xl shadow-lg">
                 {/* Left Tools */}
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" className="text-gray-300 hover:bg-gray-700 hover:text-white">Gallery</Button>
-                    <Separator orientation="vertical" className="h-8 bg-gray-600" />
+                    <Button variant="ghost" className="text-gray-300 hover:bg-accent/10 hover:text-white">
+                      <ChevronLeft className="mr-2 h-4 w-4" /> Gallery
+                    </Button>
+                    <Separator orientation="vertical" className="h-8 bg-border" />
                     <Tooltip>
                         <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-gray-700 hover:text-white"><Wrench className="w-5 h-5" /></Button>
+                           <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Wrench className="w-5 h-5" /></Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Actions</p></TooltipContent>
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-gray-700 hover:text-white"><Sparkles className="w-5 h-5" /></Button>
+                           <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Sparkles className="w-5 h-5" /></Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Adjustments</p></TooltipContent>
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                           <Button variant={activeTool === 'selection' ? 'primary' : 'ghost'} size="icon" className="text-gray-300 hover:bg-gray-700 hover:text-white" onClick={() => setActiveTool('selection')}><SquareDashedMousePointer className="w-5 h-5" /></Button>
+                           <Button variant={activeTool === 'selection' ? 'secondary' : 'ghost'} size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white" onClick={() => setActiveTool('selection')}><SquareDashedMousePointer className="w-5 h-5" /></Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Selection</p></TooltipContent>
                     </Tooltip>
                      <Tooltip>
                         <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-gray-700 hover:text-white"><Hand className="w-5 h-5" /></Button>
+                           <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Hand className="w-5 h-5" /></Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Transform</p></TooltipContent>
                     </Tooltip>
                 </div>
                  {/* Center dots - purely decorative */}
-                <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-gray-600"></span>
-                    <span className="w-2 h-2 rounded-full bg-gray-600"></span>
-                    <span className="w-2 h-2 rounded-full bg-gray-600"></span>
+                <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-border"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-border"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-border"></span>
                 </div>
                 {/* Right Tools */}
                 <div className="flex items-center gap-2">
@@ -508,22 +510,22 @@ function ArtStudioPro() {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <SheetTrigger asChild>
-                                    <Button variant={activeTool === 'brush' ? 'primary' : 'ghost'} size="icon" onClick={() => setActiveTool('brush')} className="text-gray-300 hover:bg-gray-700 hover:text-white"><Brush className="w-5 h-5" /></Button>
+                                    <Button variant={activeTool === 'brush' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('brush')} className="text-gray-300 hover:bg-accent/10 hover:text-white"><Brush className="w-5 h-5" /></Button>
                                 </SheetTrigger>
                             </TooltipTrigger>
                             <TooltipContent><p>Brushes</p></TooltipContent>
                         </Tooltip>
-                         <SheetContent side="right" className="bg-gray-800 border-l-gray-700 text-white w-96"><SheetHeader><SheetTitle>Brushes</SheetTitle></SheetHeader><BrushPanel /></SheetContent>
+                         <SheetContent side="right" className="bg-card border-l-border text-white w-96 p-0"><BrushPanel /></SheetContent>
                     </Sheet>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant={activeTool === 'smudge' ? 'primary' : 'ghost'} size="icon" onClick={() => setActiveTool('smudge')} className="text-gray-300 hover:bg-gray-700 hover:text-white"><Hand className="w-5 h-5" /></Button>
+                            <Button variant={activeTool === 'smudge' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('smudge')} className="text-gray-300 hover:bg-accent/10 hover:text-white"><Hand className="w-5 h-5" /></Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Smudge</p></TooltipContent>
                     </Tooltip>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant={activeTool === 'eraser' ? 'primary' : 'ghost'} size="icon" onClick={() => setActiveTool('eraser')} className="text-gray-300 hover:bg-gray-700 hover:text-white"><Eraser className="w-5 h-5" /></Button>
+                            <Button variant={activeTool === 'eraser' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('eraser')} className="text-gray-300 hover:bg-accent/10 hover:text-white"><Eraser className="w-5 h-5" /></Button>
                         </TooltipTrigger>
                          <TooltipContent><p>Eraser</p></TooltipContent>
                     </Tooltip>
@@ -531,12 +533,12 @@ function ArtStudioPro() {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <SheetTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-gray-700 hover:text-white"><Layers className="w-5 h-5" /></Button>
+                                    <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Layers className="w-5 h-5" /></Button>
                                 </SheetTrigger>
                             </TooltipTrigger>
                              <TooltipContent><p>Layers</p></TooltipContent>
                         </Tooltip>
-                        <SheetContent side="right" className="bg-gray-800 border-l-gray-700 text-white w-96">
+                        <SheetContent side="right" className="bg-card border-l-border text-white w-96 p-0">
                             <LayersPanel
                                 layers={layers}
                                 activeLayerId={activeLayerId}
@@ -552,12 +554,12 @@ function ArtStudioPro() {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <PopoverTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-gray-700 hover:text-white"><Palette className="w-5 h-5" /></Button>
+                                    <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Palette className="w-5 h-5" /></Button>
                                 </PopoverTrigger>
                             </TooltipTrigger>
                              <TooltipContent><p>Colors</p></TooltipContent>
                         </Tooltip>
-                         <PopoverContent className="bg-gray-800 border-gray-700 text-white w-80"><ColorPanel /></PopoverContent>
+                         <PopoverContent className="bg-card border-border text-white w-80"><ColorPanel /></PopoverContent>
                     </Popover>
                 </div>
             </header>
@@ -565,26 +567,28 @@ function ArtStudioPro() {
             {/* Main Content */}
             <main className="flex-1 flex gap-4">
                 {/* Left Controls */}
-                <aside className="flex flex-col justify-center items-center bg-gray-800 w-16 p-2 rounded-xl shadow-lg">
-                    <div className="flex-1 flex flex-col items-center justify-center gap-4 w-full px-2">
+                <aside className="flex flex-col justify-between items-center bg-card w-16 p-2 rounded-xl shadow-lg">
+                    <div className="flex flex-col items-center justify-center gap-4 w-full px-2">
                          <div className="h-48 w-full py-2">
+                              <Label className="text-xs text-muted-foreground ml-1">Size</Label>
                              <Slider 
                                 defaultValue={[5]} 
                                 max={100} 
                                 step={1} 
                                 orientation="vertical" 
-                                className="h-full"
+                                className="h-full mt-2"
                                 onValueChange={(value) => setBrushSize(value[0])}
                              />
                          </div>
-                         <div className="w-full h-8 bg-gray-700 rounded-md my-4"></div>
+                         <Separator className="bg-border" />
                           <div className="h-48 w-full py-2">
+                              <Label className="text-xs text-muted-foreground ml-1">Opacity</Label>
                               <Slider 
                                 defaultValue={[100]} 
                                 max={100} 
                                 step={1} 
                                 orientation="vertical" 
-                                className="h-full"
+                                className="h-full mt-2"
                                 onValueChange={(value) => setBrushOpacity(value[0] / 100)}
                                 />
                          </div>
@@ -592,13 +596,13 @@ function ArtStudioPro() {
                     <div className="flex flex-col gap-2">
                          <Tooltip>
                             <TooltipTrigger asChild>
-                               <Button variant="ghost" size="icon" onClick={handleUndo} disabled={historyIndex <= 0} className="text-gray-300 hover:bg-gray-700 hover:text-white"><Undo className="w-5 h-5" /></Button>
+                               <Button variant="ghost" size="icon" onClick={handleUndo} disabled={historyIndex <= 0} className="text-gray-300 hover:bg-accent/10 hover:text-white"><Undo className="w-5 h-5" /></Button>
                             </TooltipTrigger>
                              <TooltipContent side="right"><p>Undo</p></TooltipContent>
                         </Tooltip>
                          <Tooltip>
                             <TooltipTrigger asChild>
-                               <Button variant="ghost" size="icon" onClick={handleRedo} disabled={historyIndex >= history.length - 1} className="text-gray-300 hover:bg-gray-700 hover:text-white"><Redo className="w-5 h-5" /></Button>
+                               <Button variant="ghost" size="icon" onClick={handleRedo} disabled={historyIndex >= history.length - 1} className="text-gray-300 hover:bg-accent/10 hover:text-white"><Redo className="w-5 h-5" /></Button>
                             </TooltipTrigger>
                              <TooltipContent side="right"><p>Redo</p></TooltipContent>
                         </Tooltip>
@@ -606,7 +610,7 @@ function ArtStudioPro() {
                 </aside>
 
                 {/* Canvas Area */}
-                <div className="flex-1 bg-gray-800 rounded-xl shadow-inner grid place-items-center relative">
+                <div className="flex-1 bg-black/20 rounded-xl shadow-inner grid place-items-center relative">
                     <div className="relative shadow-2xl">
                         <canvas
                             ref={canvasRef}
@@ -614,18 +618,18 @@ function ArtStudioPro() {
                         />
                         <canvas
                             ref={selectionCanvasRef}
-                            className="absolute top-0 left-0 pointer-events-none z-10"
-                             onMouseDown={startDrawing}
+                            className="absolute top-0 left-0"
+                            onMouseDown={startDrawing}
                             onMouseUp={finishDrawing}
                             onMouseMove={draw}
                             onMouseLeave={finishDrawing}
                         />
                         {selection && selection.width > 0 && selection.height > 0 && (
-                          <div style={{ left: selection.x, top: Math.max(0, selection.y - 50) }} className="absolute flex gap-1 bg-gray-900/80 p-2 rounded-md shadow-lg border border-gray-700 z-20">
-                            <Button variant="ghost" size="icon" onClick={handleCopy} className="text-gray-300 hover:bg-gray-700 hover:text-white h-8 w-8"><Copy className="w-4 h-4" /></Button>
-                            <Button variant="ghost" size="icon" onClick={handleCut} className="text-gray-300 hover:bg-gray-700 hover:text-white h-8 w-8"><Scissors className="w-4 h-4" /></Button>
-                            <Button variant="ghost" size="icon" onClick={handleDelete} className="text-gray-300 hover:bg-gray-700 hover:text-white h-8 w-8"><Trash2 className="w-4 h-4" /></Button>
-                            <Button variant="ghost" size="icon" onClick={handlePaste} disabled={!clipboard} className="text-gray-300 hover:bg-gray-700 hover:text-white h-8 w-8"><ClipboardPaste className="w-4 h-4" /></Button>
+                          <div style={{ left: selection.x, top: Math.max(0, selection.y - 50) }} className="absolute flex gap-1 bg-card p-2 rounded-md shadow-lg border border-border z-20">
+                            <Button variant="ghost" size="icon" onClick={handleCopy} className="text-gray-300 hover:bg-accent/10 hover:text-white h-8 w-8"><Copy className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={handleCut} className="text-gray-300 hover:bg-accent/10 hover:text-white h-8 w-8"><Scissors className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={handleDelete} className="text-gray-300 hover:bg-accent/10 hover:text-white h-8 w-8"><Trash2 className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={handlePaste} disabled={!clipboard} className="text-gray-300 hover:bg-accent/10 hover:text-white h-8 w-8"><ClipboardPaste className="w-4 h-4" /></Button>
                           </div>
                         )}
                     </div>
@@ -637,5 +641,4 @@ function ArtStudioPro() {
 }
 
 export default ArtStudioPro;
-
-    
+ 

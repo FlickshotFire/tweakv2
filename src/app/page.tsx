@@ -47,7 +47,8 @@ import FiltersPanel from '@/components/panels/filters-panel';
 import NewCanvasPanel, { type CanvasSettings } from '@/components/panels/new-canvas-panel';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
-type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge' | 'pan';
+type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge' | 'pan' | 'shape';
+type ShapeType = 'square' | 'circle' | 'triangle';
 const MAX_HISTORY_SIZE = 30;
 
 export interface Layer {
@@ -101,6 +102,9 @@ function ArtStudioPro() {
 
   // Clipboard for cut/copy/paste
   const [clipboard, setClipboard] = useState<ImageData | null>(null);
+  
+  // Shape drawing
+  const [selectedShape, setSelectedShape] = useState<ShapeType | null>(null);
 
   const compositeLayers = useCallback(() => {
     if (!contextRef.current || !canvasRef.current) return;
@@ -209,6 +213,7 @@ function ArtStudioPro() {
         activeTool === 'eraser' ? 'destination-out' : 'source-over';
       activeLayer.context.lineCap = 'round';
       activeLayer.context.strokeStyle = brushColor;
+      activeLayer.context.fillStyle = brushColor; // For shapes
       activeLayer.context.lineWidth = brushSize;
       activeLayer.context.globalAlpha = brushOpacity;
     }
@@ -239,25 +244,32 @@ function ArtStudioPro() {
     const smudgeBrushSize = brushSize * 2;
 
     for (let i = 0; i < dist; i++) {
-        const x = lastSmudgePoint.current.x + (Math.sin(angle) * i);
-        const y = lastSmudgePoint.current.y + (Math.cos(angle) * i);
-
-        // Get the pixel data from underneath the brush
-        const pixelData = ctx.getImageData(x, y, smudgeBrushSize, smudgeBrushSize);
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        if (!tempCtx) continue;
+        const x = lastSmudgePoint.current.x + (Math.cos(angle) * i);
+        const y = lastSmudgePoint.current.y + (Math.sin(angle) * i);
         
-        tempCanvas.width = smudgeBrushSize;
-        tempCanvas.height = smudgeBrushSize;
-        tempCtx.putImageData(pixelData, 0, 0);
+        try {
+            const pixelData = ctx.getImageData(x - smudgeBrushSize/2, y - smudgeBrushSize/2, smudgeBrushSize, smudgeBrushSize);
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            if (!tempCtx) continue;
+            
+            tempCanvas.width = smudgeBrushSize;
+            tempCanvas.height = smudgeBrushSize;
+            tempCtx.putImageData(pixelData, 0, 0);
 
-        // Draw it back with a lower opacity
-        ctx.save();
-        ctx.globalAlpha = smudgeStrength * 0.1; // lower opacity for softer blend
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.drawImage(tempCanvas, x - smudgeBrushSize / 2, y - smudgeBrushSize / 2);
-        ctx.restore();
+            ctx.save();
+            ctx.globalAlpha = smudgeStrength * 0.1; // lower opacity for softer blend
+            ctx.globalCompositeOperation = 'source-over';
+            
+            ctx.beginPath();
+            ctx.arc(x, y, smudgeBrushSize/2, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(tempCanvas, x - smudgeBrushSize/2, y - smudgeBrushSize/2, smudgeBrushSize, smudgeBrushSize);
+
+            ctx.restore();
+        } catch (e) {
+            // Ignore getImageData errors at edges
+        }
     }
     
     lastSmudgePoint.current = { x: currentX, y: currentY };
@@ -288,7 +300,7 @@ function ArtStudioPro() {
       return;
     }
     
-    if (activeTool === 'selection') {
+    if (activeTool === 'selection' || activeTool === 'shape') {
       setIsDrawing(true);
       setSelectionStart({ x: offsetX, y: offsetY });
       return;
@@ -315,9 +327,24 @@ function ArtStudioPro() {
         return;
     }
     
-    if (activeTool === 'selection') {
+    if (activeTool === 'selection' || activeTool === 'shape') {
+        if(activeTool === 'shape' && selectionStart && selection) {
+            const tempCtx = selectionContextRef.current;
+            if(activeLayer && tempCtx) {
+                // Draw the final shape on the actual layer
+                drawShape(activeLayer.context, selection.x, selection.y, selection.width, selection.height);
+                // Clear the preview canvas
+                tempCtx.clearRect(0,0, tempCtx.canvas.width, tempCtx.canvas.height);
+                compositeLayers();
+                saveState();
+            }
+        }
       setIsDrawing(false);
       setSelectionStart(null);
+      // Don't clear selection for 'selection' tool until user deselects
+      if(activeTool === 'shape') {
+          setSelection(null);
+      }
       return;
     }
 
@@ -332,6 +359,34 @@ function ArtStudioPro() {
     }
     setIsDrawing(false);
   };
+  
+    const drawShape = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) => {
+        ctx.fillStyle = brushColor;
+        ctx.strokeStyle = brushColor;
+        ctx.lineWidth = brushSize;
+
+        switch(selectedShape) {
+            case 'square':
+                ctx.fillRect(x, y, w, h);
+                break;
+            case 'circle':
+                const radiusX = w / 2;
+                const radiusY = h / 2;
+                ctx.beginPath();
+                ctx.ellipse(x + radiusX, y + radiusY, radiusX, radiusY, 0, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+            case 'triangle':
+                ctx.beginPath();
+                ctx.moveTo(x + w / 2, y);
+                ctx.lineTo(x + w, y + h);
+                ctx.lineTo(x, y + h);
+                ctx.closePath();
+                ctx.fill();
+                break;
+        }
+    }
+
 
   const draw = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isDrawing) return;
@@ -347,14 +402,22 @@ function ArtStudioPro() {
         return;
     }
 
-    if (activeTool === 'selection') {
-      if (!selectionStart) return;
+    if ((activeTool === 'selection' || activeTool === 'shape') && selectionStart) {
       const x = Math.min(offsetX, selectionStart.x);
       const y = Math.min(offsetY, selectionStart.y);
       const width = Math.abs(offsetX - selectionStart.x);
       const height = Math.abs(offsetY - selectionStart.y);
       setSelection({ x, y, width, height });
-      drawSelection(x, y, width, height);
+      
+      const tempCtx = selectionContextRef.current;
+      if(tempCtx) {
+        tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
+        if(activeTool === 'selection') {
+            drawSelection(x, y, width, height);
+        } else if (activeTool === 'shape') {
+            drawShape(tempCtx, x, y, width, height);
+        }
+      }
       return;
     }
     
@@ -431,6 +494,11 @@ function ArtStudioPro() {
       clearSelection();
     }
   };
+  
+    const handleShapeSelect = (shape: ShapeType) => {
+        setActiveTool('shape');
+        setSelectedShape(shape);
+    }
 
   // Layer Management Functions
   const addLayer = () => {
@@ -517,21 +585,21 @@ function ArtStudioPro() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <DropdownMenuTrigger asChild>
-                             <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Sparkles className="w-5 h-5" /></Button>
+                             <Button variant={activeTool === 'shape' ? 'secondary' : 'ghost'} size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Sparkles className="w-5 h-5" /></Button>
                           </DropdownMenuTrigger>
                         </TooltipTrigger>
                         <TooltipContent><p>Shapes</p></TooltipContent>
                       </Tooltip>
                       <DropdownMenuContent className="bg-card border-border text-white">
-                        <DropdownMenuItem className="hover:bg-accent/10">
+                        <DropdownMenuItem onSelect={() => handleShapeSelect('square')} className="hover:bg-accent/10">
                           <Square className="mr-2 h-4 w-4" />
                           <span>Square</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="hover:bg-accent/10">
+                        <DropdownMenuItem onSelect={() => handleShapeSelect('circle')} className="hover:bg-accent/10">
                           <Circle className="mr-2 h-4 w-4" />
                           <span>Circle</span>
                         </DropdownMenuItem>
-                         <DropdownMenuItem className="hover:bg-accent/10">
+                         <DropdownMenuItem onSelect={() => handleShapeSelect('triangle')} className="hover:bg-accent/10">
                           <Triangle className="mr-2 h-4 w-4" />
                           <span>Triangle</span>
                         </DropdownMenuItem>
@@ -672,7 +740,7 @@ function ArtStudioPro() {
                       className="relative shadow-2xl transition-transform duration-200"
                       style={{ 
                         transform: `scale(${canvasZoom / 100}) translate(${canvasPosition.x}px, ${canvasPosition.y}px)`,
-                        cursor: activeTool === 'pan' ? 'grab' : 'default'
+                        cursor: activeTool === 'pan' ? 'grab' : activeTool === 'shape' ? 'crosshair' : 'default'
                       }}
                     >
                         <canvas
@@ -682,9 +750,9 @@ function ArtStudioPro() {
                         <canvas
                             ref={selectionCanvasRef}
                             className="absolute top-0 left-0"
-                            style={{ pointerEvents: activeTool === 'selection' ? 'auto' : 'none' }}
+                            style={{ pointerEvents: 'none' }}
                         />
-                        {selection && selection.width > 0 && selection.height > 0 && (
+                        {selection && selection.width > 0 && selection.height > 0 && activeTool === 'selection' && (
                           <div style={{ left: selection.x, top: Math.max(0, selection.y - 50) }} className="absolute flex gap-1 bg-card p-2 rounded-md shadow-lg border border-border z-20">
                             <Button variant="ghost" size="icon" onClick={handleCopy} className="text-gray-300 hover:bg-accent/10 hover:text-white h-8 w-8"><Copy className="w-4 h-4" /></Button>
                             <Button variant="ghost" size="icon" onClick={handleCut} className="text-gray-300 hover:bg-accent/10 hover:text-white h-8 w-8"><Scissors className="w-4 h-4" /></Button>
@@ -714,3 +782,5 @@ function ArtStudioPro() {
 }
 
 export default ArtStudioPro;
+
+    

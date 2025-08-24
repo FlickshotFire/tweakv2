@@ -21,7 +21,9 @@ import {
   Trash2,
   ClipboardPaste,
   Wrench,
-  ChevronLeft
+  ChevronLeft,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -66,6 +68,7 @@ function ArtStudioPro() {
   // Layer state
   const [layers, setLayers] = useState<Layer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
+  const [canvasZoom, setCanvasZoom] = useState(100);
 
   const getActiveLayer = useCallback(() => {
     return layers.find(l => l.id === activeLayerId) || null;
@@ -269,8 +272,21 @@ function ArtStudioPro() {
     compositeLayers();
   };
 
-  const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
-    const { offsetX, offsetY } = nativeEvent;
+  const getCanvasCoordinates = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvasEl = selectionCanvasRef.current;
+    if (!canvasEl) return { offsetX: 0, offsetY: 0};
+    
+    const rect = canvasEl.getBoundingClientRect();
+    const scale = canvasZoom / 100;
+    
+    return {
+      offsetX: (event.clientX - rect.left) / scale,
+      offsetY: (event.clientY - rect.top) / scale,
+    }
+  }
+
+  const startDrawing = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    const { offsetX, offsetY } = getCanvasCoordinates(event);
     const activeLayer = getActiveLayer();
     if (!activeLayer) return;
 
@@ -313,9 +329,9 @@ function ArtStudioPro() {
     setIsDrawing(false);
   };
 
-  const draw = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
-    const { offsetX, offsetY } = nativeEvent;
+    const { offsetX, offsetY } = getCanvasCoordinates(event);
     const activeLayer = getActiveLayer();
 
     if (activeTool === 'selection') {
@@ -565,7 +581,7 @@ function ArtStudioPro() {
             </header>
 
             {/* Main Content */}
-            <main className="flex-1 flex gap-4">
+            <main className="flex-1 flex gap-4 overflow-hidden">
                 {/* Left Controls */}
                 <aside className="flex flex-col justify-between items-center bg-card w-16 p-2 rounded-xl shadow-lg">
                     <div className="flex flex-col items-center justify-center gap-4 w-full px-2">
@@ -610,8 +626,11 @@ function ArtStudioPro() {
                 </aside>
 
                 {/* Canvas Area */}
-                <div className="flex-1 bg-black/20 rounded-xl shadow-inner grid place-items-center relative">
-                    <div className="relative shadow-2xl">
+                <div className="flex-1 bg-black/20 rounded-xl shadow-inner grid place-items-center relative overflow-auto">
+                    <div 
+                      className="relative shadow-2xl transition-transform duration-200"
+                      style={{ transform: `scale(${canvasZoom / 100})` }}
+                    >
                         <canvas
                             ref={canvasRef}
                             className="bg-white rounded-lg"
@@ -632,6 +651,19 @@ function ArtStudioPro() {
                             <Button variant="ghost" size="icon" onClick={handlePaste} disabled={!clipboard} className="text-gray-300 hover:bg-accent/10 hover:text-white h-8 w-8"><ClipboardPaste className="w-4 h-4" /></Button>
                           </div>
                         )}
+                    </div>
+                     <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-card p-2 rounded-lg shadow-lg border border-border">
+                        <ZoomOut className="w-5 h-5 text-muted-foreground" />
+                        <Slider 
+                            value={[canvasZoom]} 
+                            max={400} 
+                            min={10}
+                            step={1} 
+                            className="w-32"
+                            onValueChange={(value) => setCanvasZoom(value[0])}
+                        />
+                        <ZoomIn className="w-5 h-5 text-muted-foreground" />
+                        <span className="text-sm font-mono w-12 text-center">{canvasZoom.toFixed(0)}%</span>
                     </div>
                 </div>
             </main>

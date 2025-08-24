@@ -33,12 +33,10 @@ import NewCanvasPanel, { type CanvasSettings } from '@/components/panels/new-can
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
-type Panel = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai-assistant';
 type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge';
 const MAX_HISTORY_SIZE = 30;
 
 export default function Home() {
-  const [activePanel, setActivePanel] = useState<Panel | null>(null);
   const [activeTool, setActiveTool] = useState<DrawingTool>('brush');
   const [canvas, setCanvas] = useState<CanvasSettings | null>(null);
   const [isNewCanvasDialogOpen, setIsNewCanvasDialogOpen] = useState(false);
@@ -259,16 +257,6 @@ export default function Home() {
     setSelection(null);
     clearSelection();
   };
-
-  const handlePanelChange = (panelId: Panel) => {
-    setActivePanel(prev => (prev === panelId ? null : panelId));
-  };
-  
-  const handleSheetOpenChange = (open: boolean) => {
-    if (!open) {
-      setActivePanel(null);
-    }
-  };
   
   return (
     <TooltipProvider delayDuration={100}>
@@ -310,89 +298,103 @@ export default function Home() {
             <TooltipContent side="right"><p>Selection</p></TooltipContent>
           </Tooltip>
           <Separator />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={activePanel === 'brushes' ? 'secondary' : 'ghost'} size="icon" aria-label="Brushes" onClick={() => handlePanelChange('brushes')}>
-                <Brush className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right"><p>Brushes</p></TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={activePanel === 'layers' ? 'secondary' : 'ghost'} size="icon" aria-label="Layers" onClick={() => handlePanelChange('layers')}>
-                <Layers className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right"><p>Layers</p></TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={activePanel === 'colors' ? 'secondary' : 'ghost'} size="icon" aria-label="Color Palette" onClick={() => handlePanelChange('colors')}>
-                <Palette className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right"><p>Color Palette</p></TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={activePanel === 'filters' ? 'secondary' : 'ghost'} size="icon" aria-label="Filters & Effects" onClick={() => handlePanelChange('filters')}>
-                <Settings2 className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right"><p>Filters & Effects</p></TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={activePanel === 'ai-assistant' ? 'secondary' : 'ghost'} size="icon" aria-label="AI Assistant" onClick={() => handlePanelChange('ai-assistant')}>
-                <Sparkles className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right"><p>AI Assistant</p></TooltipContent>
-          </Tooltip>
-        </aside>
 
-        {/* Panel Content */}
-        <Sheet open={activePanel === 'brushes'} onOpenChange={handleSheetOpenChange}>
+          {/* Panel Triggers */}
+          <Sheet>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant='ghost' size="icon" aria-label="Brushes">
+                    <Brush className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right"><p>Brushes</p></TooltipContent>
+            </Tooltip>
             <SheetContent side="left" className="w-80 p-0 border-r z-50">
-                <SheetHeader className="p-4 border-b">
+              <SheetHeader className="p-4 border-b">
                 <SheetTitle className="font-headline">Brushes</SheetTitle>
-                </SheetHeader>
-                <BrushPanel />
+              </SheetHeader>
+              <BrushPanel />
             </SheetContent>
-        </Sheet>
-        <Sheet open={activePanel === 'layers'} onOpenChange={handleSheetOpenChange}>
+          </Sheet>
+
+          <Sheet>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant='ghost' size="icon" aria-label="Layers">
+                    <Layers className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right"><p>Layers</p></TooltipContent>
+            </Tooltip>
             <SheetContent side="left" className="w-80 p-0 border-r z-50">
                 <SheetHeader className="p-4 border-b">
                 <SheetTitle className="font-headline">Layers</SheetTitle>
                 </SheetHeader>
                 <LayersPanel />
             </SheetContent>
-        </Sheet>
-        <Sheet open={activePanel === 'colors'} onOpenChange={handleSheetOpenChange}>
+          </Sheet>
+
+          <Sheet>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant='ghost' size="icon" aria-label="Color Palette">
+                    <Palette className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right"><p>Color Palette</p></TooltipContent>
+            </Tooltip>
             <SheetContent side="left" className="w-80 p-0 border-r z-50">
                 <SheetHeader className="p-4 border-b">
                 <SheetTitle className="font-headline">Color Palette</SheetTitle>
                 </SheetHeader>
                 <ColorPanel />
             </SheetContent>
-        </Sheet>
-        <Sheet open={activePanel === 'filters'} onOpenChange={handleSheetOpenChange}>
+          </Sheet>
+          
+          <Sheet>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant='ghost' size="icon" aria-label="Filters & Effects">
+                    <Settings2 className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right"><p>Filters & Effects</p></TooltipContent>
+            </Tooltip>
             <SheetContent side="left" className="w-80 p-0 border-r z-50">
                 <SheetHeader className="p-4 border-b">
                 <SheetTitle className="font-headline">Filters & Effects</SheetTitle>
                 </SheetHeader>
                 <FiltersPanel />
             </SheetContent>
-        </Sheet>
-        <Sheet open={activePanel === 'ai-assistant'} onOpenChange={handleSheetOpenChange}>
+          </Sheet>
+
+          <Sheet>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant='ghost' size="icon" aria-label="AI Assistant">
+                    <Sparkles className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right"><p>AI Assistant</p></TooltipContent>
+            </Tooltip>
             <SheetContent side="left" className="w-80 p-0 border-r z-50">
                 <SheetHeader className="p-4 border-b">
                 <SheetTitle className="font-headline">AI Assistant</SheetTitle>
                 </SheetHeader>
                 <AiAssistantPanel />
             </SheetContent>
-        </Sheet>
+          </Sheet>
+        </aside>
 
         {/* Main Content */}
         <div className="flex flex-1 flex-col">

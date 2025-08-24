@@ -16,6 +16,10 @@ import {
   Redo,
   SquareDashedMousePointer,
   Hand,
+  Copy,
+  Scissors,
+  Trash2,
+  ClipboardPaste,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -61,6 +65,9 @@ export default function Home() {
   const [smudgeStrength, setSmudgeStrength] = useState(0.5); // Default 50%
   const lastSmudgePoint = useRef<{ x: number, y: number } | null>(null);
 
+  // Clipboard for cut/copy/paste
+  const [clipboard, setClipboard] = useState<ImageData | null>(null);
+  
   const saveState = useCallback(() => {
     if (canvasRef.current && contextRef.current) {
       const canvasData = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -137,11 +144,12 @@ export default function Home() {
     if (selectionContextRef.current && selectionCanvasRef.current) {
       selectionContextRef.current.clearRect(0, 0, selectionCanvasRef.current.width, selectionCanvasRef.current.height);
     }
+    setSelection(null);
   }
 
   const drawSelection = (x: number, y: number, width: number, height: number) => {
     if (selectionContextRef.current) {
-      clearSelection();
+      selectionContextRef.current.clearRect(0, 0, selectionCanvasRef.current.width, selectionCanvasRef.current.height);
       selectionContextRef.current.strokeRect(x, y, width, height);
     }
   }
@@ -203,7 +211,6 @@ export default function Home() {
     lastSmudgePoint.current = { x: currentX, y: currentY };
   };
 
-
   const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
     const { offsetX, offsetY } = nativeEvent;
 
@@ -231,6 +238,7 @@ export default function Home() {
     if (activeTool === 'selection') {
         setIsDrawing(false);
         setSelectionStart(null);
+        // Don't clear selection here, so the user can interact with it
         return;
     }
 
@@ -289,19 +297,13 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    if(historyIndex > -1) {
-        restoreState(historyIndex);
-    }
-  }, [historyIndex, restoreState]);
-
   const handleCreateCanvas = (settings: CanvasSettings) => {
     setCanvas(settings);
     setHistory([]);
     setHistoryIndex(-1);
     setIsNewCanvasDialogOpen(false);
-    setSelection(null);
     clearSelection();
+    setClipboard(null);
   };
 
   const handlePanelChange = (panelId: PanelId) => {
@@ -342,6 +344,40 @@ export default function Home() {
     }
   }
 
+  const handleCopy = () => {
+    if (selection && contextRef.current) {
+      const imageData = contextRef.current.getImageData(selection.x, selection.y, selection.width, selection.height);
+      setClipboard(imageData);
+    }
+  };
+
+  const handleCut = () => {
+    if (selection && contextRef.current) {
+      handleCopy();
+      contextRef.current.fillStyle = 'white';
+      contextRef.current.fillRect(selection.x, selection.y, selection.width, selection.height);
+      saveState();
+      clearSelection();
+    }
+  };
+
+  const handleDelete = () => {
+    if (selection && contextRef.current) {
+      contextRef.current.fillStyle = 'white';
+      contextRef.current.fillRect(selection.x, selection.y, selection.width, selection.height);
+      saveState();
+      clearSelection();
+    }
+  };
+
+  const handlePaste = () => {
+    if (clipboard && contextRef.current && selection) {
+      contextRef.current.putImageData(clipboard, selection.x, selection.y);
+      saveState();
+      clearSelection();
+    }
+  };
+
   return (
     <TooltipProvider delayDuration={100}>
       <div className="flex h-screen w-screen bg-background text-foreground font-body">
@@ -351,7 +387,7 @@ export default function Home() {
           <Separator />
           <Tooltip>
             <TooltipTrigger asChild>
-                <Button variant={activeTool === 'brush' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('brush')} aria-label="Brush">
+                <Button variant={activeTool === 'brush' ? 'secondary' : 'ghost'} size="icon" onClick={() => { setActiveTool('brush'); clearSelection(); }} aria-label="Brush">
                     <Brush className="h-6 w-6" />
                 </Button>
             </TooltipTrigger>
@@ -359,7 +395,7 @@ export default function Home() {
           </Tooltip>
            <Tooltip>
             <TooltipTrigger asChild>
-                <Button variant={activeTool === 'eraser' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('eraser')} aria-label="Eraser">
+                <Button variant={activeTool === 'eraser' ? 'secondary' : 'ghost'} size="icon" onClick={() => { setActiveTool('eraser'); clearSelection(); }} aria-label="Eraser">
                     <Eraser className="h-6 w-6" />
                 </Button>
             </TooltipTrigger>
@@ -367,7 +403,7 @@ export default function Home() {
           </Tooltip>
            <Tooltip>
             <TooltipTrigger asChild>
-                <Button variant={activeTool === 'smudge' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('smudge')} aria-label="Smudge Tool">
+                <Button variant={activeTool === 'smudge' ? 'secondary' : 'ghost'} size="icon" onClick={() => { setActiveTool('smudge'); clearSelection(); }} aria-label="Smudge Tool">
                     <Hand className="h-6 w-6" />
                 </Button>
             </TooltipTrigger>
@@ -529,6 +565,48 @@ export default function Home() {
                         ref={selectionCanvasRef}
                         className="absolute top-0 left-0 pointer-events-none z-10"
                     />
+
+                    {selection && (
+                      <div 
+                        className="absolute flex items-center gap-1 bg-card p-2 rounded-md shadow-lg border z-20"
+                        style={{ left: selection.x, top: selection.y - 50 }}
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={handleCopy} className="h-8 w-8">
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Copy</p></TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={handleCut} className="h-8 w-8">
+                              <Scissors className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Cut</p></TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={handleDelete} className="h-8 w-8">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Delete</p></TooltipContent>
+                        </Tooltip>
+                        <Separator orientation="vertical" className="h-6 mx-1" />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={handlePaste} disabled={!clipboard} className="h-8 w-8">
+                              <ClipboardPaste className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Paste</p></TooltipContent>
+                        </Tooltip>
+                      </div>
+                    )}
+                    
                     {activeTool === 'smudge' && (
                         <div className="absolute -top-12 left-0 flex items-center gap-2 bg-card px-3 py-1 rounded-md shadow-sm">
                             <label htmlFor="smudge-strength" className="text-sm">Strength:</label>

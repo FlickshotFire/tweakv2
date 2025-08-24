@@ -15,6 +15,7 @@ import {
   Undo,
   Redo,
   SquareDashedMousePointer,
+  Hand,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -33,7 +34,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 type Panel = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai-assistant';
-type DrawingTool = 'brush' | 'eraser' | 'selection';
+type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge';
 
 export default function Home() {
   const [activePanel, setActivePanel] = useState<Panel | null>(null);
@@ -53,6 +54,10 @@ export default function Home() {
   // Selection state
   const [selection, setSelection] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
   const [selectionStart, setSelectionStart] = useState<{ x: number, y: number } | null>(null);
+
+  // Smudge tool state
+  const [smudgeStrength, setSmudgeStrength] = useState(0.5); // Default 50%
+  const lastSmudgePoint = useRef<{ x: number, y: number } | null>(null);
 
 
   const saveState = useCallback(() => {
@@ -98,7 +103,7 @@ export default function Home() {
         selectionContextRef.current = selectionContext;
       }
     }
-  }, [canvas]);
+  }, [canvas, saveState]);
 
   useEffect(() => {
      if (contextRef.current) {
@@ -121,11 +126,19 @@ export default function Home() {
 
   const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
     const { offsetX, offsetY } = nativeEvent;
+
     if (activeTool === 'selection') {
         setIsDrawing(true);
         setSelectionStart({ x: offsetX, y: offsetY });
         return;
     }
+    
+    if (activeTool === 'smudge') {
+        setIsDrawing(true);
+        lastSmudgePoint.current = { x: offsetX, y: offsetY };
+        return;
+    }
+
     if (!contextRef.current) return;
     contextRef.current.beginPath();
     contextRef.current.moveTo(offsetX, offsetY);
@@ -141,10 +154,46 @@ export default function Home() {
         return;
     }
 
+    if (activeTool === 'smudge') {
+        lastSmudgePoint.current = null;
+    }
+
     if (!contextRef.current) return;
     contextRef.current.closePath();
     saveState();
   };
+
+  const smudge = (currentX: number, currentY: number) => {
+    if (!contextRef.current || !canvasRef.current || !lastSmudgePoint.current) return;
+
+    const ctx = contextRef.current;
+    const brushSize = ctx.lineWidth;
+    const lastX = lastSmudgePoint.current.x;
+    const lastY = lastSmudgePoint.current.y;
+    
+    const dist = Math.hypot(currentX - lastX, currentY - lastY);
+    const angle = Math.atan2(currentY - lastY, currentX - lastX);
+
+    for (let i = 0; i < dist; i += 1) {
+        const x = lastX + Math.cos(angle) * i;
+        const y = lastY + Math.sin(angle) * i;
+
+        const sourceX = Math.floor(x - brushSize / 2);
+        const sourceY = Math.floor(y - brushSize / 2);
+
+        if (sourceX < 0 || sourceY < 0 || sourceX + brushSize > canvasRef.current.width || sourceY + brushSize > canvasRef.current.height) {
+            continue;
+        }
+
+        const imageData = ctx.getImageData(sourceX, sourceY, brushSize, brushSize);
+        
+        ctx.globalAlpha = smudgeStrength * 0.1; // Lower alpha for blending
+        ctx.putImageData(imageData, sourceX + Math.cos(angle), sourceY + Math.sin(angle));
+        ctx.globalAlpha = 1.0; // Reset alpha
+    }
+    lastSmudgePoint.current = { x: currentX, y: currentY };
+  }
+
 
   const draw = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
@@ -161,6 +210,11 @@ export default function Home() {
         return;
     }
     
+    if (activeTool === 'smudge') {
+        smudge(offsetX, offsetY);
+        return;
+    }
+
     if (!contextRef.current) return;
     contextRef.current.lineTo(offsetX, offsetY);
     contextRef.current.stroke();
@@ -223,6 +277,14 @@ export default function Home() {
                 </Button>
             </TooltipTrigger>
             <TooltipContent side="right"><p>Eraser</p></TooltipContent>
+          </Tooltip>
+           <Tooltip>
+            <TooltipTrigger asChild>
+                <Button variant={activeTool === 'smudge' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('smudge')} aria-label="Smudge Tool">
+                    <Hand className="h-6 w-6" />
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Smudge</p></TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -331,14 +393,14 @@ export default function Home() {
                     <canvas
                         ref={canvasRef}
                         className="bg-white rounded-lg shadow-2xl border-2 border-dashed"
-                    />
-                    <canvas
-                        ref={selectionCanvasRef}
-                        className="absolute top-0 left-0 pointer-events-none z-10"
                         onMouseDown={startDrawing}
                         onMouseUp={finishDrawing}
                         onMouseMove={draw}
                         onMouseLeave={finishDrawing}
+                    />
+                    <canvas
+                        ref={selectionCanvasRef}
+                        className="absolute top-0 left-0 pointer-events-none z-10"
                     />
                 </div>
             )}

@@ -14,6 +14,7 @@ import {
   Eraser,
   Undo,
   Redo,
+  SquareDashedMousePointer,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 type Panel = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai-assistant';
-type DrawingTool = 'brush' | 'eraser';
+type DrawingTool = 'brush' | 'eraser' | 'selection';
 
 export default function Home() {
   const [activePanel, setActivePanel] = useState<Panel | null>(null);
@@ -41,11 +42,18 @@ export default function Home() {
   const [isNewCanvasDialogOpen, setIsNewCanvasDialogOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const selectionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const selectionContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
   // Undo/Redo state
   const [history, setHistory] = useState<ImageData[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Selection state
+  const [selection, setSelection] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
+  const [selectionStart, setSelectionStart] = useState<{ x: number, y: number } | null>(null);
+
 
   const saveState = useCallback(() => {
     if (canvasRef.current && contextRef.current) {
@@ -64,10 +72,15 @@ export default function Home() {
   }, [history, historyIndex]);
 
   useEffect(() => {
-    if (canvas && canvasRef.current) {
+    if (canvas && canvasRef.current && selectionCanvasRef.current) {
       const canvasEl = canvasRef.current;
+      const selectionCanvasEl = selectionCanvasRef.current;
+
       canvasEl.width = canvas.width;
       canvasEl.height = canvas.height;
+      selectionCanvasEl.width = canvas.width;
+      selectionCanvasEl.height = canvas.height;
+      
       const context = canvasEl.getContext('2d');
       if (context) {
         context.lineCap = 'round';
@@ -75,6 +88,14 @@ export default function Home() {
         context.lineWidth = 5;
         contextRef.current = context;
         saveState();
+      }
+
+      const selectionContext = selectionCanvasEl.getContext('2d');
+      if (selectionContext) {
+        selectionContext.strokeStyle = 'rgba(0, 100, 255, 0.7)';
+        selectionContext.lineWidth = 1;
+        selectionContext.setLineDash([4, 4]);
+        selectionContextRef.current = selectionContext;
       }
     }
   }, [canvas]);
@@ -85,9 +106,27 @@ export default function Home() {
      }
   }, [activeTool]);
 
+  const clearSelection = () => {
+    if (selectionContextRef.current && selectionCanvasRef.current) {
+        selectionContextRef.current.clearRect(0, 0, selectionCanvasRef.current.width, selectionCanvasRef.current.height);
+    }
+  }
+
+  const drawSelection = (x: number, y: number, width: number, height: number) => {
+    if (selectionContextRef.current) {
+      clearSelection();
+      selectionContextRef.current.strokeRect(x, y, width, height);
+    }
+  }
+
   const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!contextRef.current) return;
     const { offsetX, offsetY } = nativeEvent;
+    if (activeTool === 'selection') {
+        setIsDrawing(true);
+        setSelectionStart({ x: offsetX, y: offsetY });
+        return;
+    }
+    if (!contextRef.current) return;
     contextRef.current.beginPath();
     contextRef.current.moveTo(offsetX, offsetY);
     setIsDrawing(true);
@@ -95,15 +134,34 @@ export default function Home() {
 
   const finishDrawing = () => {
     if (!isDrawing) return;
+    setIsDrawing(false);
+    
+    if (activeTool === 'selection') {
+        setSelectionStart(null);
+        return;
+    }
+
     if (!contextRef.current) return;
     contextRef.current.closePath();
-    setIsDrawing(false);
     saveState();
   };
 
   const draw = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !contextRef.current) return;
+    if (!isDrawing) return;
     const { offsetX, offsetY } = nativeEvent;
+
+    if (activeTool === 'selection') {
+        if (!selectionStart) return;
+        const x = Math.min(offsetX, selectionStart.x);
+        const y = Math.min(offsetY, selectionStart.y);
+        const width = Math.abs(offsetX - selectionStart.x);
+        const height = Math.abs(offsetY - selectionStart.y);
+        setSelection({x, y, width, height});
+        drawSelection(x, y, width, height);
+        return;
+    }
+    
+    if (!contextRef.current) return;
     contextRef.current.lineTo(offsetX, offsetY);
     contextRef.current.stroke();
   };
@@ -138,6 +196,8 @@ export default function Home() {
     setHistory([]);
     setHistoryIndex(-1);
     setIsNewCanvasDialogOpen(false);
+    setSelection(null);
+    clearSelection();
   };
   
 
@@ -145,7 +205,7 @@ export default function Home() {
     <TooltipProvider delayDuration={100}>
       <div className="flex h-screen w-screen bg-background text-foreground font-body">
         {/* Left Sidebar for tools */}
-        <aside className="flex flex-col items-center space-y-4 p-2 bg-card border-r z-10">
+        <aside className="flex flex-col items-center space-y-4 p-2 bg-card border-r z-20">
           <h1 className="text-2xl font-headline font-bold text-primary" aria-label="ArtStudio Pro">A</h1>
           <Separator />
           <Tooltip>
@@ -164,6 +224,14 @@ export default function Home() {
             </TooltipTrigger>
             <TooltipContent side="right"><p>Eraser</p></TooltipContent>
           </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+                <Button variant={activeTool === 'selection' ? 'secondary' : 'ghost'} size="icon" onClick={() => setActiveTool('selection')} aria-label="Selection Tool">
+                    <SquareDashedMousePointer className="h-6 w-6" />
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Selection</p></TooltipContent>
+          </Tooltip>
           <Separator />
           {panels.map((panel) => (
             <Sheet key={panel.id} onOpenChange={(open) => setActivePanel(open ? panel.id : null)}>
@@ -179,7 +247,7 @@ export default function Home() {
                   <p>{panel.label}</p>
                 </TooltipContent>
               </Tooltip>
-              <SheetContent side="left" className="w-80 p-0 border-r">
+              <SheetContent side="left" className="w-80 p-0 border-r z-50">
                 <SheetHeader className="p-4 border-b">
                   <SheetTitle className="font-headline">{panel.label}</SheetTitle>
                 </SheetHeader>
@@ -259,15 +327,20 @@ export default function Home() {
                     </Dialog>
               </div>
             ) : (
-                <canvas
-                    ref={canvasRef}
-                    className="bg-white rounded-lg shadow-2xl border-2 border-dashed"
-                    onMouseDown={startDrawing}
-                    onMouseUp={finishDrawing}
-                    onMouseMove={draw}
-                    onMouseLeave={finishDrawing}
-                >
-                </canvas>
+                <div className="relative">
+                    <canvas
+                        ref={canvasRef}
+                        className="bg-white rounded-lg shadow-2xl border-2 border-dashed"
+                    />
+                    <canvas
+                        ref={selectionCanvasRef}
+                        className="absolute top-0 left-0 pointer-events-none z-10"
+                        onMouseDown={startDrawing}
+                        onMouseUp={finishDrawing}
+                        onMouseMove={draw}
+                        onMouseLeave={finishDrawing}
+                    />
+                </div>
             )}
           </main>
         </div>

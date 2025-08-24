@@ -74,6 +74,11 @@ function ArtStudioPro() {
   const [canvasPosition, setCanvasPosition] = useState({ x: 0, y: 0 });
   const panStartRef = useRef<{ x: number, y: number } | null>(null);
 
+  // Brush settings
+  const [brushColor, setBrushColor] = useState('#000000');
+  const [brushSize, setBrushSize] = useState(5);
+  const [brushOpacity, setBrushOpacity] = useState(1);
+  
   const getActiveLayer = useCallback(() => {
     return layers.find(l => l.id === activeLayerId) || null;
   }, [layers, activeLayerId]);
@@ -84,7 +89,7 @@ function ArtStudioPro() {
 
   // Selection state
   const [selection, setSelection] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
-  const [selectionStart, setSelectionStart] = useState<{ x: number, y: number } | null>(null);
+  const [selectionStart, setSelectionStart] = useState<{ x: number, y: number } | null(null);
 
   // Smudge tool state
   const [smudgeStrength, setSmudgeStrength] = useState(0.5);
@@ -92,9 +97,6 @@ function ArtStudioPro() {
 
   // Clipboard for cut/copy/paste
   const [clipboard, setClipboard] = useState<ImageData | null>(null);
-  
-  const [brushSize, setBrushSize] = useState(5);
-  const [brushOpacity, setBrushOpacity] = useState(1);
 
   const compositeLayers = useCallback(() => {
     if (!contextRef.current || !canvasRef.current) return;
@@ -195,18 +197,18 @@ function ArtStudioPro() {
     compositeLayers();
   }, [layers, compositeLayers]);
 
-  // Update brush settings when tool changes
+  // Update brush settings when tool or settings change
   useEffect(() => {
     const activeLayer = getActiveLayer();
     if (activeLayer) {
       activeLayer.context.globalCompositeOperation =
         activeTool === 'eraser' ? 'destination-out' : 'source-over';
       activeLayer.context.lineCap = 'round';
-      activeLayer.context.strokeStyle = 'black';
+      activeLayer.context.strokeStyle = brushColor;
       activeLayer.context.lineWidth = brushSize;
       activeLayer.context.globalAlpha = brushOpacity;
     }
-  }, [activeTool, activeLayerId, getActiveLayer, brushSize, brushOpacity]);
+  }, [activeTool, activeLayerId, getActiveLayer, brushSize, brushOpacity, brushColor]);
 
   const clearSelection = () => {
     if (selectionContextRef.current && selectionCanvasRef.current) {
@@ -225,51 +227,33 @@ function ArtStudioPro() {
   const smudge = (currentX: number, currentY: number) => {
     const activeLayer = getActiveLayer();
     if (!activeLayer || !lastSmudgePoint.current) return;
-
     const ctx = activeLayer.context;
-    const smudgeBrushSize = brushSize * 2;
-    const lastX = lastSmudgePoint.current.x;
-    const lastY = lastSmudgePoint.current.y;
     
-    const dist = Math.hypot(currentX - lastX, currentY - lastY);
-    const angle = Math.atan2(currentY - lastY, currentX - lastX);
+    const dist = Math.hypot(currentX - lastSmudgePoint.current.x, currentY - lastSmudgePoint.current.y);
+    const angle = Math.atan2(currentY - lastSmudgePoint.current.y, currentX - lastSmudgePoint.current.x);
+    
+    const smudgeBrushSize = brushSize * 2;
 
-    const sampleOffsetX = -Math.cos(angle) * smudgeBrushSize * 0.5;
-    const sampleOffsetY = -Math.sin(angle) * smudgeBrushSize * 0.5;
+    for (let i = 0; i < dist; i++) {
+        const x = lastSmudgePoint.current.x + (Math.sin(angle) * i);
+        const y = lastSmudgePoint.current.y + (Math.cos(angle) * i);
 
-    for (let i = 0; i < dist; i += 2) {
-      const x = lastX + Math.cos(angle) * i;
-      const y = lastY + Math.sin(angle) * i;
+        // Get the pixel data from underneath the brush
+        const pixelData = ctx.getImageData(x, y, smudgeBrushSize, smudgeBrushSize);
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        if (!tempCtx) continue;
+        
+        tempCanvas.width = smudgeBrushSize;
+        tempCanvas.height = smudgeBrushSize;
+        tempCtx.putImageData(pixelData, 0, 0);
 
-      const sourceX = Math.floor(x + sampleOffsetX - smudgeBrushSize / 2);
-      const sourceY = Math.floor(y + sampleOffsetY - smudgeBrushSize / 2);
-      
-      if (
-        sourceX < 0 ||
-        sourceY < 0 ||
-        sourceX + smudgeBrushSize > activeLayer.canvas.width ||
-        sourceY + smudgeBrushSize > activeLayer.canvas.height ||
-        x - smudgeBrushSize / 2 < 0 ||
-        y - smudgeBrushSize / 2 < 0 ||
-        x + smudgeBrushSize / 2 > activeLayer.canvas.width ||
-        y + smudgeBrushSize / 2 > activeLayer.canvas.height
-      ) {
-        continue;
-      }
-      
-      const imageData = ctx.getImageData(sourceX, sourceY, smudgeBrushSize, smudgeBrushSize);
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = smudgeBrushSize;
-      tempCanvas.height = smudgeBrushSize;
-      const tempCtx = tempCanvas.getContext('2d');
-      
-      if (tempCtx) {
-        tempCtx.putImageData(imageData, 0, 0);
+        // Draw it back with a lower opacity
         ctx.save();
-        ctx.globalAlpha = smudgeStrength;
+        ctx.globalAlpha = smudgeStrength * 0.1; // lower opacity for softer blend
+        ctx.globalCompositeOperation = 'source-over';
         ctx.drawImage(tempCanvas, x - smudgeBrushSize / 2, y - smudgeBrushSize / 2);
         ctx.restore();
-      }
     }
     
     lastSmudgePoint.current = { x: currentX, y: currentY };
@@ -605,7 +589,9 @@ function ArtStudioPro() {
                             </TooltipTrigger>
                              <TooltipContent><p>Colors</p></TooltipContent>
                         </Tooltip>
-                         <PopoverContent className="bg-card border-border text-white w-80"><ColorPanel /></PopoverContent>
+                         <PopoverContent className="bg-card border-border text-white w-80">
+                           <ColorPanel color={brushColor} onChange={setBrushColor} />
+                         </PopoverContent>
                     </Popover>
                 </div>
             </header>
@@ -706,5 +692,3 @@ function ArtStudioPro() {
 }
 
 export default ArtStudioPro;
-
-    

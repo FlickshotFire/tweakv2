@@ -253,9 +253,9 @@ export default function Home() {
     clearSelection();
   };
 
-  const handlePanelChange = useCallback((panel: Panel) => (open: boolean) => {
+  const handlePanelChange = (panel: Panel, open: boolean) => {
     setActivePanel(open ? panel : null);
-  }, []);
+  };
   
   return (
     <TooltipProvider delayDuration={100}>
@@ -298,7 +298,7 @@ export default function Home() {
           </Tooltip>
           <Separator />
           {panels.map(({ id, label, icon: Icon, panel: PanelComponent }) => (
-            <Sheet key={id} onOpenChange={handlePanelChange(id)}>
+            <Sheet key={id} open={activePanel === id} onOpenChange={(open) => handlePanelChange(id, open)}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <SheetTrigger asChild>

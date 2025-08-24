@@ -108,9 +108,13 @@ export default function Home() {
         }
         return newHistory;
       });
-      setHistoryIndex(prev => Math.min(prev + 1, MAX_HISTORY_SIZE - 1));
+      setHistoryIndex(prev => {
+        const newHistory = history.slice(0, prev + 1);
+        const newIndex = newHistory.length;
+        return Math.min(newIndex, MAX_HISTORY_SIZE - 1);
+      });
     }
-  }, [historyIndex, getActiveLayer]);
+  }, [historyIndex, getActiveLayer, history]);
 
   const restoreState = useCallback((index: number) => {
     const activeLayer = getActiveLayer();

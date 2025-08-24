@@ -30,11 +30,12 @@ import LayersPanel from '@/components/panels/layers-panel';
 import ColorPanel from '@/components/panels/color-panel';
 import FiltersPanel from '@/components/panels/filters-panel';
 import NewCanvasPanel, { type CanvasSettings } from '@/components/panels/new-canvas-panel';
-import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 type Panel = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai-assistant';
 type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge';
+const MAX_HISTORY_SIZE = 30;
 
 const panels: { id: Panel; label: string; icon: React.ElementType; panel: React.ElementType }[] = [
     { id: 'brushes', label: 'Brushes', icon: Brush, panel: BrushPanel },
@@ -70,11 +71,17 @@ export default function Home() {
 
   const saveState = useCallback(() => {
     if (canvasRef.current && contextRef.current) {
-      const canvasData = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-      const newHistory = history.slice(0, historyIndex + 1);
-      newHistory.push(canvasData);
-      setHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
+        const canvasData = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+        const newHistory = history.slice(0, historyIndex + 1);
+        newHistory.push(canvasData);
+
+        // Limit history size
+        if (newHistory.length > MAX_HISTORY_SIZE) {
+            newHistory.shift();
+        }
+
+        setHistory(newHistory);
+        setHistoryIndex(newHistory.length - 1);
     }
   }, [history, historyIndex]);
 
@@ -100,6 +107,10 @@ export default function Home() {
         context.strokeStyle = 'black';
         context.lineWidth = 5;
         contextRef.current = context;
+        
+        // Initial blank state
+        context.fillStyle = 'white';
+        context.fillRect(0, 0, canvas.width, canvas.height);
         saveState();
       }
 
@@ -155,20 +166,25 @@ export default function Home() {
 
   const finishDrawing = () => {
     if (!isDrawing) return;
-    setIsDrawing(false);
     
     if (activeTool === 'selection') {
+        setIsDrawing(false);
         setSelectionStart(null);
         return;
     }
 
     if (activeTool === 'smudge') {
+        setIsDrawing(false);
         lastSmudgePoint.current = null;
     }
 
     if (!contextRef.current) return;
     contextRef.current.closePath();
-    saveState();
+    setIsDrawing(false);
+    
+    if(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'smudge') {
+      saveState();
+    }
   };
 
   const smudge = (currentX: number, currentY: number) => {
@@ -253,8 +269,8 @@ export default function Home() {
     clearSelection();
   };
 
-  const handlePanelChange = (panel: Panel, open: boolean) => {
-    setActivePanel(open ? panel : null);
+  const handlePanelChange = (panelId: Panel) => {
+    setActivePanel(prev => (prev === panelId ? null : panelId));
   };
   
   return (
@@ -298,26 +314,26 @@ export default function Home() {
           </Tooltip>
           <Separator />
           {panels.map(({ id, label, icon: Icon, panel: PanelComponent }) => (
-            <Sheet key={id} open={activePanel === id} onOpenChange={(open) => handlePanelChange(id, open)}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <SheetTrigger asChild>
-                    <Button variant={activePanel === id ? 'secondary' : 'ghost'} size="icon" aria-label={label}>
-                      <Icon className="h-6 w-6" />
-                    </Button>
-                  </SheetTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>{label}</p>
-                </TooltipContent>
-              </Tooltip>
-              <SheetContent side="left" className="w-80 p-0 border-r z-50">
-                <SheetHeader className="p-4 border-b">
-                  <SheetTitle className="font-headline">{label}</SheetTitle>
-                </SheetHeader>
-                <PanelComponent />
-              </SheetContent>
-            </Sheet>
+             <Sheet key={id} open={activePanel === id} onOpenChange={() => handlePanelChange(id)}>
+               <Tooltip>
+                 <TooltipTrigger asChild>
+                   <SheetTrigger asChild>
+                     <Button variant={activePanel === id ? 'secondary' : 'ghost'} size="icon" aria-label={label}>
+                       <Icon className="h-6 w-6" />
+                     </Button>
+                   </SheetTrigger>
+                 </TooltipTrigger>
+                 <TooltipContent side="right">
+                   <p>{label}</p>
+                 </TooltipContent>
+               </Tooltip>
+               <SheetContent side="left" className="w-80 p-0 border-r z-50">
+                 <SheetHeader className="p-4 border-b">
+                   <SheetTitle className="font-headline">{label}</SheetTitle>
+                 </SheetHeader>
+                 <PanelComponent />
+               </SheetContent>
+             </Sheet>
           ))}
         </aside>
 
@@ -359,7 +375,10 @@ export default function Home() {
                       </DropdownMenuItem>
                     </DialogTrigger>
                     <DialogContent>
-                      <VisuallyHidden><DialogTitle>Create New Canvas</DialogTitle></VisuallyHidden>
+                      <DialogHeader>
+                        <DialogTitle>Create New Canvas</DialogTitle>
+                        <DialogDescription>Set up your canvas dimensions, resolution, and color profile.</DialogDescription>
+                      </DialogHeader>
                       <NewCanvasPanel onCreate={handleCreateCanvas} />
                     </DialogContent>
                   </Dialog>
@@ -385,7 +404,10 @@ export default function Home() {
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
-                         <VisuallyHidden><DialogTitle>Create New Canvas</DialogTitle></VisuallyHidden>
+                         <DialogHeader>
+                           <DialogTitle>Create New Canvas</DialogTitle>
+                           <DialogDescription>Set up your canvas dimensions, resolution, and color profile.</DialogDescription>
+                         </DialogHeader>
                          <NewCanvasPanel onCreate={handleCreateCanvas} />
                       </DialogContent>
                     </Dialog>

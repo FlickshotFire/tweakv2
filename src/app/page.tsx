@@ -24,6 +24,9 @@ import {
   ChevronLeft,
   ZoomIn,
   ZoomOut,
+  Square,
+  Circle,
+  Triangle,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -33,6 +36,7 @@ import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
 import AiAssistantPanel from '@/components/panels/ai-assistant-panel';
@@ -509,12 +513,30 @@ function ArtStudioPro() {
                         </TooltipTrigger>
                         <TooltipContent><p>Actions</p></TooltipContent>
                     </Tooltip>
-                    <Tooltip>
+                    <DropdownMenu>
+                      <Tooltip>
                         <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Sparkles className="w-5 h-5" /></Button>
+                          <DropdownMenuTrigger asChild>
+                             <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white"><Sparkles className="w-5 h-5" /></Button>
+                          </DropdownMenuTrigger>
                         </TooltipTrigger>
-                        <TooltipContent><p>Adjustments</p></TooltipContent>
-                    </Tooltip>
+                        <TooltipContent><p>Shapes</p></TooltipContent>
+                      </Tooltip>
+                      <DropdownMenuContent className="bg-card border-border text-white">
+                        <DropdownMenuItem className="hover:bg-accent/10">
+                          <Square className="mr-2 h-4 w-4" />
+                          <span>Square</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="hover:bg-accent/10">
+                          <Circle className="mr-2 h-4 w-4" />
+                          <span>Circle</span>
+                        </DropdownMenuItem>
+                         <DropdownMenuItem className="hover:bg-accent/10">
+                          <Triangle className="mr-2 h-4 w-4" />
+                          <span>Triangle</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Tooltip>
                         <TooltipTrigger asChild>
                            <Button variant={activeTool === 'selection' ? 'secondary' : 'ghost'} size="icon" className="text-gray-300 hover:bg-accent/10 hover:text-white" onClick={() => setActiveTool('selection')}><SquareDashedMousePointer className="w-5 h-5" /></Button>
@@ -692,5 +714,3 @@ function ArtStudioPro() {
 }
 
 export default ArtStudioPro;
-
-    

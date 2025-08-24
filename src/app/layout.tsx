@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'ArtStudio Pro',
-  description: 'A professional art and drawing application.',
+  title: 'Tweak',
+  description: 'Designed by Aman Bhardwaj. crafted with love, Interest, time , skills and love',
 };
 
 export default function RootLayout({

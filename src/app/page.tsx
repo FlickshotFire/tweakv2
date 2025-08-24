@@ -548,8 +548,8 @@ function ArtStudioPro() {
         <Dialog open={!canvas} onOpenChange={(isOpen) => !isOpen && handleCreateCanvas({width: 1920, height: 1080, resolution: 300, colorProfile: 'sRGB'})}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="font-headline text-2xl">Welcome to ArtStudio Pro</DialogTitle>
-              <DialogDescription>Create a new canvas to start your masterpiece.</DialogDescription>
+              <DialogTitle className="font-headline text-2xl">Welcome to Tweak</DialogTitle>
+              <DialogDescription>Designed by Aman Bhardwaj. crafted with love, Interest, time , skills and love</DialogDescription>
             </DialogHeader>
             <NewCanvasPanel onCreate={handleCreateCanvas} />
           </DialogContent>

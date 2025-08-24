@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Brush,
   Layers,
@@ -34,6 +34,46 @@ export default function Home() {
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
   const [canvas, setCanvas] = useState<CanvasSettings | null>(null);
   const [isNewCanvasDialogOpen, setIsNewCanvasDialogOpen] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  useEffect(() => {
+    if (canvas && canvasRef.current) {
+      const canvasEl = canvasRef.current;
+      canvasEl.width = canvas.width;
+      canvasEl.height = canvas.height;
+      const context = canvasEl.getContext('2d');
+      if (context) {
+        context.lineCap = 'round';
+        context.strokeStyle = 'black';
+        context.lineWidth = 5;
+        contextRef.current = context;
+      }
+    }
+  }, [canvas]);
+
+  const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!contextRef.current) return;
+    const { offsetX, offsetY } = nativeEvent;
+    contextRef.current.beginPath();
+    contextRef.current.moveTo(offsetX, offsetY);
+    setIsDrawing(true);
+  };
+
+  const finishDrawing = () => {
+     if (!contextRef.current) return;
+    contextRef.current.closePath();
+    setIsDrawing(false);
+  };
+
+  const draw = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !contextRef.current) return;
+    const { offsetX, offsetY } = nativeEvent;
+    contextRef.current.lineTo(offsetX, offsetY);
+    contextRef.current.stroke();
+  };
+
 
   const tools: { id: Tool; label: string; icon: React.ElementType; panel: React.ElementType }[] = [
     { id: 'brushes', label: 'Brushes', icon: Brush, panel: BrushPanel },
@@ -100,6 +140,7 @@ export default function Home() {
                       </DropdownMenuItem>
                     </DialogTrigger>
                     <DialogContent>
+                      <VisuallyHidden><DialogTitle>Create New Canvas</DialogTitle></VisuallyHidden>
                       <NewCanvasPanel onCreate={handleCreateCanvas} />
                     </DialogContent>
                   </Dialog>
@@ -125,17 +166,21 @@ export default function Home() {
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
+                         <VisuallyHidden><DialogTitle>Create New Canvas</DialogTitle></VisuallyHidden>
                          <NewCanvasPanel onCreate={handleCreateCanvas} />
                       </DialogContent>
                     </Dialog>
               </div>
             ) : (
-                <div 
-                    className="bg-white rounded-lg shadow-2xl border-2 border-dashed" 
-                    style={{ width: canvas.width, height: canvas.height }}
+                <canvas
+                    ref={canvasRef}
+                    className="bg-white rounded-lg shadow-2xl border-2 border-dashed"
+                    onMouseDown={startDrawing}
+                    onMouseUp={finishDrawing}
+                    onMouseMove={draw}
+                    onMouseLeave={finishDrawing}
                 >
-                    {/* This would be the actual canvas component */}
-                </div>
+                </canvas>
             )}
           </main>
         </div>

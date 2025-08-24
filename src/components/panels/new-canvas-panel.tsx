@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { FilePlus } from "lucide-react";
-import { DialogTitle } from "@/components/ui/dialog";
+import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const formSchema = z.object({
   width: z.coerce.number().min(1, "Width must be at least 1."),
@@ -43,10 +43,8 @@ export default function NewCanvasPanel({ onCreate }: NewCanvasPanelProps) {
   return (
     <Card className="border-0 shadow-none">
       <CardHeader>
-        <DialogTitle asChild>
-          <CardTitle className="font-headline text-2xl">Create New Canvas</CardTitle>
-        </DialogTitle>
-        <CardDescription>Set up your canvas dimensions, resolution, and color profile.</CardDescription>
+          <CardTitle asChild><DialogTitle className="font-headline text-2xl">Create New Canvas</DialogTitle></CardTitle>
+          <CardDescription asChild><DialogDescription>Set up your canvas dimensions, resolution, and color profile.</DialogDescription></CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>

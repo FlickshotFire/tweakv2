@@ -148,7 +148,7 @@ export default function Home() {
   }
 
   const drawSelection = (x: number, y: number, width: number, height: number) => {
-    if (selectionContextRef.current) {
+    if (selectionContextRef.current && selectionCanvasRef.current) {
       selectionContextRef.current.clearRect(0, 0, selectionCanvasRef.current.width, selectionCanvasRef.current.height);
       selectionContextRef.current.strokeRect(x, y, width, height);
     }
@@ -345,14 +345,14 @@ export default function Home() {
   }
 
   const handleCopy = () => {
-    if (selection && contextRef.current) {
+    if (selection && contextRef.current && selection.width > 0 && selection.height > 0) {
       const imageData = contextRef.current.getImageData(selection.x, selection.y, selection.width, selection.height);
       setClipboard(imageData);
     }
   };
 
   const handleCut = () => {
-    if (selection && contextRef.current) {
+    if (selection && contextRef.current && selection.width > 0 && selection.height > 0) {
       handleCopy();
       contextRef.current.fillStyle = 'white';
       contextRef.current.fillRect(selection.x, selection.y, selection.width, selection.height);
@@ -362,7 +362,7 @@ export default function Home() {
   };
 
   const handleDelete = () => {
-    if (selection && contextRef.current) {
+    if (selection && contextRef.current && selection.width > 0 && selection.height > 0) {
       contextRef.current.fillStyle = 'white';
       contextRef.current.fillRect(selection.x, selection.y, selection.width, selection.height);
       saveState();

@@ -36,6 +36,14 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 type Panel = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai-assistant';
 type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge';
 
+const panels: { id: Panel; label: string; icon: React.ElementType; panel: React.ElementType }[] = [
+    { id: 'brushes', label: 'Brushes', icon: Brush, panel: BrushPanel },
+    { id: 'layers', label: 'Layers', icon: Layers, panel: LayersPanel },
+    { id: 'colors', label: 'Color Palette', icon: Palette, panel: ColorPanel },
+    { id: 'filters', label: 'Filters & Effects', icon: Settings2, panel: FiltersPanel },
+    { id: 'ai-assistant', label: 'AI Assistant', icon: Sparkles, panel: AiAssistantPanel },
+];
+
 export default function Home() {
   const [activePanel, setActivePanel] = useState<Panel | null>(null);
   const [activeTool, setActiveTool] = useState<DrawingTool>('brush');
@@ -236,15 +244,6 @@ export default function Home() {
     restoreState();
   }, [historyIndex, restoreState]);
 
-
-  const panels: { id: Panel; label: string; icon: React.ElementType; panel: React.ElementType }[] = [
-    { id: 'brushes', label: 'Brushes', icon: Brush, panel: BrushPanel },
-    { id: 'layers', label: 'Layers', icon: Layers, panel: LayersPanel },
-    { id: 'colors', label: 'Color Palette', icon: Palette, panel: ColorPanel },
-    { id: 'filters', label: 'Filters & Effects', icon: Settings2, panel: FiltersPanel },
-    { id: 'ai-assistant', label: 'AI Assistant', icon: Sparkles, panel: AiAssistantPanel },
-  ];
-
   const handleCreateCanvas = (settings: CanvasSettings) => {
     setCanvas(settings);
     setHistory([]);
@@ -254,7 +253,6 @@ export default function Home() {
     clearSelection();
   };
   
-
   return (
     <TooltipProvider delayDuration={100}>
       <div className="flex h-screen w-screen bg-background text-foreground font-body">
@@ -295,25 +293,25 @@ export default function Home() {
             <TooltipContent side="right"><p>Selection</p></TooltipContent>
           </Tooltip>
           <Separator />
-          {panels.map((panel) => (
-            <Sheet key={panel.id} onOpenChange={(open) => setActivePanel(open ? panel.id : null)}>
+          {panels.map(({ id, label, icon: Icon, panel: PanelComponent }) => (
+            <Sheet key={id} onOpenChange={(open) => setActivePanel(open ? id : null)}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <SheetTrigger asChild>
-                    <Button variant={activePanel === panel.id ? 'secondary' : 'ghost'} size="icon" aria-label={panel.label}>
-                      <panel.icon className="h-6 w-6" />
+                    <Button variant={activePanel === id ? 'secondary' : 'ghost'} size="icon" aria-label={label}>
+                      <Icon className="h-6 w-6" />
                     </Button>
                   </SheetTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  <p>{panel.label}</p>
+                  <p>{label}</p>
                 </TooltipContent>
               </Tooltip>
               <SheetContent side="left" className="w-80 p-0 border-r z-50">
                 <SheetHeader className="p-4 border-b">
-                  <SheetTitle className="font-headline">{panel.label}</SheetTitle>
+                  <SheetTitle className="font-headline">{label}</SheetTitle>
                 </SheetHeader>
-                <panel.panel />
+                <PanelComponent />
               </SheetContent>
             </Sheet>
           ))}

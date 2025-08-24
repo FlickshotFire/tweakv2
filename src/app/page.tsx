@@ -37,14 +37,6 @@ type Panel = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai-assistant';
 type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge';
 const MAX_HISTORY_SIZE = 30;
 
-const panels: { id: Panel; label: string; icon: React.ElementType; panel: React.ElementType }[] = [
-    { id: 'brushes', label: 'Brushes', icon: Brush, panel: BrushPanel },
-    { id: 'layers', label: 'Layers', icon: Layers, panel: LayersPanel },
-    { id: 'colors', label: 'Color Palette', icon: Palette, panel: ColorPanel },
-    { id: 'filters', label: 'Filters & Effects', icon: Settings2, panel: FiltersPanel },
-    { id: 'ai-assistant', label: 'AI Assistant', icon: Sparkles, panel: AiAssistantPanel },
-];
-
 export default function Home() {
   const [activePanel, setActivePanel] = useState<Panel | null>(null);
   const [activeTool, setActiveTool] = useState<DrawingTool>('brush');
@@ -268,7 +260,7 @@ export default function Home() {
     clearSelection();
   };
 
-  const handlePanelChange = (panelId: Panel) => {
+  const handlePanelChange = (panelId: Panel | null) => {
     setActivePanel(prev => (prev === panelId ? null : panelId));
   };
   
@@ -312,32 +304,89 @@ export default function Home() {
             <TooltipContent side="right"><p>Selection</p></TooltipContent>
           </Tooltip>
           <Separator />
-          {panels.map(({ id, label, icon: Icon }) => (
-             <Tooltip key={id}>
-               <TooltipTrigger asChild>
-                 <Button variant={activePanel === id ? 'secondary' : 'ghost'} size="icon" aria-label={label} onClick={() => handlePanelChange(id)}>
-                   <Icon className="h-6 w-6" />
-                 </Button>
-               </TooltipTrigger>
-               <TooltipContent side="right">
-                 <p>{label}</p>
-               </TooltipContent>
-             </Tooltip>
-          ))}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant={activePanel === 'brushes' ? 'secondary' : 'ghost'} size="icon" aria-label="Brushes" onClick={() => handlePanelChange('brushes')}>
+                <Brush className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Brushes</p></TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant={activePanel === 'layers' ? 'secondary' : 'ghost'} size="icon" aria-label="Layers" onClick={() => handlePanelChange('layers')}>
+                <Layers className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Layers</p></TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant={activePanel === 'colors' ? 'secondary' : 'ghost'} size="icon" aria-label="Color Palette" onClick={() => handlePanelChange('colors')}>
+                <Palette className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Color Palette</p></TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant={activePanel === 'filters' ? 'secondary' : 'ghost'} size="icon" aria-label="Filters & Effects" onClick={() => handlePanelChange('filters')}>
+                <Settings2 className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>Filters & Effects</p></TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant={activePanel === 'ai-assistant' ? 'secondary' : 'ghost'} size="icon" aria-label="AI Assistant" onClick={() => handlePanelChange('ai-assistant')}>
+                <Sparkles className="h-6 w-6" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right"><p>AI Assistant</p></TooltipContent>
+          </Tooltip>
         </aside>
 
         {/* Panel Content */}
-        {panels.map(({ id, label, panel: PanelComponent }) => (
-            <Sheet key={id} open={activePanel === id} onOpenChange={() => handlePanelChange(id)}>
-              <SheetContent side="left" className="w-80 p-0 border-r z-50">
-                <SheetHeader className="p-4 border-b">
-                  <SheetTitle className="font-headline">{label}</SheetTitle>
-                </SheetHeader>
-                <PanelComponent />
-              </SheetContent>
-            </Sheet>
-        ))}
-
+        <Sheet open={activePanel === 'brushes'} onOpenChange={(open) => !open && handlePanelChange(null)}>
+          <SheetContent side="left" className="w-80 p-0 border-r z-50">
+            <SheetHeader className="p-4 border-b">
+              <SheetTitle className="font-headline">Brushes</SheetTitle>
+            </SheetHeader>
+            <BrushPanel />
+          </SheetContent>
+        </Sheet>
+        <Sheet open={activePanel === 'layers'} onOpenChange={(open) => !open && handlePanelChange(null)}>
+          <SheetContent side="left" className="w-80 p-0 border-r z-50">
+            <SheetHeader className="p-4 border-b">
+              <SheetTitle className="font-headline">Layers</SheetTitle>
+            </SheetHeader>
+            <LayersPanel />
+          </SheetContent>
+        </Sheet>
+        <Sheet open={activePanel === 'colors'} onOpenChange={(open) => !open && handlePanelChange(null)}>
+          <SheetContent side="left" className="w-80 p-0 border-r z-50">
+            <SheetHeader className="p-4 border-b">
+              <SheetTitle className="font-headline">Color Palette</SheetTitle>
+            </SheetHeader>
+            <ColorPanel />
+          </SheetContent>
+        </Sheet>
+        <Sheet open={activePanel === 'filters'} onOpenChange={(open) => !open && handlePanelChange(null)}>
+          <SheetContent side="left" className="w-80 p-0 border-r z-50">
+            <SheetHeader className="p-4 border-b">
+              <SheetTitle className="font-headline">Filters & Effects</SheetTitle>
+            </SheetHeader>
+            <FiltersPanel />
+          </SheetContent>
+        </Sheet>
+        <Sheet open={activePanel === 'ai-assistant'} onOpenChange={(open) => !open && handlePanelChange(null)}>
+          <SheetContent side="left" className="w-80 p-0 border-r z-50">
+            <SheetHeader className="p-4 border-b">
+              <SheetTitle className="font-headline">AI Assistant</SheetTitle>
+            </SheetHeader>
+            <AiAssistantPanel />
+          </SheetContent>
+        </Sheet>
 
         {/* Main Content */}
         <div className="flex flex-1 flex-col">

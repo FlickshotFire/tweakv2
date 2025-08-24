@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -37,10 +37,17 @@ import NewCanvasPanel, { type CanvasSettings } from '@/components/panels/new-can
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
-
-type PanelId = 'brushes' | 'layers' | 'colors' | 'filters' | 'ai';
 type DrawingTool = 'brush' | 'eraser' | 'selection' | 'smudge';
 const MAX_HISTORY_SIZE = 30;
+
+export interface Layer {
+  id: string;
+  name: string;
+  canvas: HTMLCanvasElement;
+  context: CanvasRenderingContext2D;
+  visible: boolean;
+  opacity: number;
+}
 
 export default function Home() {
   const [activeTool, setActiveTool] = useState<DrawingTool>('brush');
@@ -51,7 +58,11 @@ export default function Home() {
   const selectionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const selectionContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [activePanel, setActivePanel] = useState<PanelId | null>(null);
+
+  // Layer state
+  const [layers, setLayers] = useState<Layer[]>([]);
+  const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
+  const getActiveLayer = useCallback(() => layers.find(l => l.id === activeLayerId), [layers, activeLayerId]);
 
   // Undo/Redo state
   const [history, setHistory] = useState<ImageData[]>([]);
@@ -68,62 +79,59 @@ export default function Home() {
   // Clipboard for cut/copy/paste
   const [clipboard, setClipboard] = useState<ImageData | null>(null);
   
+  const compositeLayers = useCallback(() => {
+    if (!contextRef.current || !canvasRef.current) return;
+    
+    contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    contextRef.current.fillStyle = 'white';
+    contextRef.current.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    
+    layers.forEach(layer => {
+      if (layer.visible) {
+        contextRef.current!.globalAlpha = layer.opacity;
+        contextRef.current!.drawImage(layer.canvas, 0, 0);
+      }
+    });
+    contextRef.current.globalAlpha = 1.0;
+  }, [layers]);
+
   const saveState = useCallback(() => {
-    if (canvasRef.current && contextRef.current) {
-      const canvasData = contextRef.current.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+    const activeLayer = getActiveLayer();
+    if (activeLayer) {
+      const canvasData = activeLayer.context.getImageData(0, 0, activeLayer.canvas.width, activeLayer.canvas.height);
       
       setHistory(prevHistory => {
         const newHistory = prevHistory.slice(0, historyIndex + 1);
         newHistory.push(canvasData);
-        
-        // Limit history size
         if (newHistory.length > MAX_HISTORY_SIZE) {
           newHistory.shift();
         }
-        
         return newHistory;
       });
-      
-      setHistoryIndex(prev => {
-        const newHistory = history.slice(0, prev + 1);
-        return newHistory.length >= MAX_HISTORY_SIZE ? prev : prev + 1;
-      });
+      setHistoryIndex(prev => Math.min(prev + 1, MAX_HISTORY_SIZE - 1));
     }
-  }, [historyIndex, history]);
+  }, [historyIndex, getActiveLayer]);
 
   const restoreState = useCallback((index: number) => {
-    if (contextRef.current && index >= 0 && index < history.length && history[index]) {
-      contextRef.current.putImageData(history[index], 0, 0);
+    const activeLayer = getActiveLayer();
+    if (activeLayer && index >= 0 && index < history.length && history[index]) {
+      activeLayer.context.putImageData(history[index], 0, 0);
+      compositeLayers();
     }
-  }, [history]);
+  }, [history, getActiveLayer, compositeLayers]);
 
+  // Initial setup
   useEffect(() => {
     if (canvas && canvasRef.current && selectionCanvasRef.current) {
       const canvasEl = canvasRef.current;
       const selectionCanvasEl = selectionCanvasRef.current;
-
+      
       canvasEl.width = canvas.width;
       canvasEl.height = canvas.height;
       selectionCanvasEl.width = canvas.width;
       selectionCanvasEl.height = canvas.height;
       
-      const context = canvasEl.getContext('2d');
-      if (context) {
-        context.lineCap = 'round';
-        context.strokeStyle = 'black';
-        context.lineWidth = 5;
-        contextRef.current = context;
-        
-        // Initial blank state
-        context.fillStyle = 'white';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Save initial state
-        const initialData = context.getImageData(0, 0, canvas.width, canvas.height);
-        setHistory([initialData]);
-        setHistoryIndex(0);
-      }
-
+      contextRef.current = canvasEl.getContext('2d');
       const selectionContext = selectionCanvasEl.getContext('2d');
       if (selectionContext) {
         selectionContext.strokeStyle = 'rgba(0, 100, 255, 0.7)';
@@ -131,15 +139,48 @@ export default function Home() {
         selectionContext.setLineDash([4, 4]);
         selectionContextRef.current = selectionContext;
       }
+      
+      const firstLayerId = `layer-${Date.now()}`;
+      const newLayerCanvas = document.createElement('canvas');
+      newLayerCanvas.width = canvas.width;
+      newLayerCanvas.height = canvas.height;
+      const newLayerContext = newLayerCanvas.getContext('2d')!;
+      
+      setLayers([{
+        id: firstLayerId,
+        name: 'Layer 1',
+        canvas: newLayerCanvas,
+        context: newLayerContext,
+        visible: true,
+        opacity: 1,
+      }]);
+      setActiveLayerId(firstLayerId);
+      
+      // Reset history for new canvas
+      setHistory([]);
+      setHistoryIndex(-1);
+      
+      // Composite once to draw background
+      compositeLayers();
     }
-  }, [canvas]);
+  }, [canvas, compositeLayers]);
+
+  // Re-composite when layers change
+  useEffect(() => {
+    compositeLayers();
+  }, [layers, compositeLayers]);
+
 
   useEffect(() => {
-    if (contextRef.current) {
-      contextRef.current.globalCompositeOperation = activeTool === 'eraser' ? 'destination-out' : 'source-over';
+    const activeLayer = getActiveLayer();
+    if (activeLayer) {
+      activeLayer.context.globalCompositeOperation = activeTool === 'eraser' ? 'destination-out' : 'source-over';
+      activeLayer.context.lineCap = 'round';
+      activeLayer.context.strokeStyle = 'black';
+      activeLayer.context.lineWidth = 5;
     }
-  }, [activeTool]);
-
+  }, [activeTool, getActiveLayer]);
+  
   const clearSelection = () => {
     if (selectionContextRef.current && selectionCanvasRef.current) {
       selectionContextRef.current.clearRect(0, 0, selectionCanvasRef.current.width, selectionCanvasRef.current.height);
@@ -155,9 +196,10 @@ export default function Home() {
   }
 
   const smudge = (currentX: number, currentY: number) => {
-    if (!contextRef.current || !canvasRef.current || !lastSmudgePoint.current) return;
+    const activeLayer = getActiveLayer();
+    if (!activeLayer || !lastSmudgePoint.current) return;
 
-    const ctx = contextRef.current;
+    const ctx = activeLayer.context;
     const brushSize = Math.max(ctx.lineWidth * 2, 10);
     const lastX = lastSmudgePoint.current.x;
     const lastY = lastSmudgePoint.current.y;
@@ -165,7 +207,6 @@ export default function Home() {
     const dist = Math.hypot(currentX - lastX, currentY - lastY);
     const angle = Math.atan2(currentY - lastY, currentX - lastX);
 
-    // Sample from behind the brush movement
     const sampleOffsetX = -Math.cos(angle) * brushSize * 0.5;
     const sampleOffsetY = -Math.sin(angle) * brushSize * 0.5;
 
@@ -173,34 +214,26 @@ export default function Home() {
       const x = lastX + Math.cos(angle) * i;
       const y = lastY + Math.sin(angle) * i;
 
-      // Sample from a point behind the current position
       const sourceX = Math.floor(x + sampleOffsetX - brushSize / 2);
       const sourceY = Math.floor(y + sampleOffsetY - brushSize / 2);
-
-      // Ensure we're within canvas bounds
+      
       if (sourceX < 0 || sourceY < 0 || 
-          sourceX + brushSize > canvasRef.current.width || 
-          sourceY + brushSize > canvasRef.current.height ||
+          sourceX + brushSize > activeLayer.canvas.width || 
+          sourceY + brushSize > activeLayer.canvas.height ||
           x - brushSize / 2 < 0 || y - brushSize / 2 < 0 ||
-          x + brushSize / 2 > canvasRef.current.width ||
-          y + brushSize / 2 > canvasRef.current.height) {
+          x + brushSize / 2 > activeLayer.canvas.width ||
+          y + brushSize / 2 > activeLayer.canvas.height) {
         continue;
       }
-
-      // Get the image data from the source position
-      const imageData = ctx.getImageData(sourceX, sourceY, brushSize, brushSize);
       
-      // Create a temporary canvas for blending
+      const imageData = ctx.getImageData(sourceX, sourceY, brushSize, brushSize);
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = brushSize;
       tempCanvas.height = brushSize;
       const tempCtx = tempCanvas.getContext('2d');
       
       if (tempCtx) {
-        // Put the sampled data on temp canvas
         tempCtx.putImageData(imageData, 0, 0);
-        
-        // Draw with blending on main canvas
         ctx.save();
         ctx.globalAlpha = smudgeStrength * 0.3;
         ctx.drawImage(tempCanvas, x - brushSize / 2, y - brushSize / 2);
@@ -209,36 +242,38 @@ export default function Home() {
     }
     
     lastSmudgePoint.current = { x: currentX, y: currentY };
+    compositeLayers();
   };
 
   const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
     const { offsetX, offsetY } = nativeEvent;
+    const activeLayer = getActiveLayer();
+    if (!activeLayer) return;
 
     if (activeTool === 'selection') {
-        setIsDrawing(true);
-        setSelectionStart({ x: offsetX, y: offsetY });
-        return;
+      setIsDrawing(true);
+      setSelectionStart({ x: offsetX, y: offsetY });
+      return;
     }
     
     if (activeTool === 'smudge') {
-        setIsDrawing(true);
-        lastSmudgePoint.current = { x: offsetX, y: offsetY };
-        return;
+      setIsDrawing(true);
+      lastSmudgePoint.current = { x: offsetX, y: offsetY };
+      return;
     }
 
-    if (!contextRef.current) return;
-    contextRef.current.beginPath();
-    contextRef.current.moveTo(offsetX, offsetY);
+    activeLayer.context.beginPath();
+    activeLayer.context.moveTo(offsetX, offsetY);
     setIsDrawing(true);
   };
 
   const finishDrawing = () => {
     if (!isDrawing) return;
+    const activeLayer = getActiveLayer();
     
     if (activeTool === 'selection') {
         setIsDrawing(false);
         setSelectionStart(null);
-        // Don't clear selection here, so the user can interact with it
         return;
     }
 
@@ -247,38 +282,39 @@ export default function Home() {
         lastSmudgePoint.current = null;
     }
 
-    if (!contextRef.current) return;
-    contextRef.current.closePath();
-    setIsDrawing(false);
-    
-    if(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'smudge') {
+    if (activeLayer) {
+      activeLayer.context.closePath();
       saveState();
     }
+    setIsDrawing(false);
   };
 
   const draw = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
     const { offsetX, offsetY } = nativeEvent;
+    const activeLayer = getActiveLayer();
 
     if (activeTool === 'selection') {
-        if (!selectionStart) return;
-        const x = Math.min(offsetX, selectionStart.x);
-        const y = Math.min(offsetY, selectionStart.y);
-        const width = Math.abs(offsetX - selectionStart.x);
-        const height = Math.abs(offsetY - selectionStart.y);
-        setSelection({x, y, width, height});
-        drawSelection(x, y, width, height);
-        return;
+      if (!selectionStart) return;
+      const x = Math.min(offsetX, selectionStart.x);
+      const y = Math.min(offsetY, selectionStart.y);
+      const width = Math.abs(offsetX - selectionStart.x);
+      const height = Math.abs(offsetY - selectionStart.y);
+      setSelection({x, y, width, height});
+      drawSelection(x, y, width, height);
+      return;
     }
     
     if (activeTool === 'smudge') {
-        smudge(offsetX, offsetY);
-        return;
+      smudge(offsetX, offsetY);
+      return;
     }
 
-    if (!contextRef.current) return;
-    contextRef.current.lineTo(offsetX, offsetY);
-    contextRef.current.stroke();
+    if (activeLayer) {
+      activeLayer.context.lineTo(offsetX, offsetY);
+      activeLayer.context.stroke();
+      compositeLayers();
+    }
   };
   
   const handleUndo = () => {
@@ -299,84 +335,87 @@ export default function Home() {
 
   const handleCreateCanvas = (settings: CanvasSettings) => {
     setCanvas(settings);
-    setHistory([]);
-    setHistoryIndex(-1);
+    setLayers([]); // This will be reset in useEffect
     setIsNewCanvasDialogOpen(false);
     clearSelection();
     setClipboard(null);
   };
-
-  const handlePanelChange = (panelId: PanelId) => {
-    setActivePanel((current) => (current === panelId ? null : panelId));
-  };
   
-  const renderPanelContent = () => {
-    switch(activePanel) {
-      case 'brushes':
-        return <BrushPanel />;
-      case 'layers':
-        return <LayersPanel />;
-      case 'colors':
-        return <ColorPanel />;
-      case 'filters':
-        return <FiltersPanel />;
-      case 'ai':
-        return <AiAssistantPanel />;
-      default:
-        return null;
-    }
-  };
-
-  const getPanelTitle = () => {
-     switch(activePanel) {
-      case 'brushes':
-        return 'Brushes';
-      case 'layers':
-        return 'Layers';
-      case 'colors':
-        return 'Color Palette';
-      case 'filters':
-        return 'Filters & Effects';
-      case 'ai':
-        return 'AI Assistant';
-      default:
-        return '';
-    }
-  }
-
   const handleCopy = () => {
-    if (selection && contextRef.current && selection.width > 0 && selection.height > 0) {
-      const imageData = contextRef.current.getImageData(selection.x, selection.y, selection.width, selection.height);
+    const activeLayer = getActiveLayer();
+    if (selection && activeLayer && selection.width > 0 && selection.height > 0) {
+      const imageData = activeLayer.context.getImageData(selection.x, selection.y, selection.width, selection.height);
       setClipboard(imageData);
     }
   };
 
   const handleCut = () => {
-    if (selection && contextRef.current && selection.width > 0 && selection.height > 0) {
+    const activeLayer = getActiveLayer();
+    if (selection && activeLayer && selection.width > 0 && selection.height > 0) {
       handleCopy();
-      contextRef.current.fillStyle = 'white';
-      contextRef.current.fillRect(selection.x, selection.y, selection.width, selection.height);
+      activeLayer.context.clearRect(selection.x, selection.y, selection.width, selection.height);
+      compositeLayers();
       saveState();
       clearSelection();
     }
   };
 
   const handleDelete = () => {
-    if (selection && contextRef.current && selection.width > 0 && selection.height > 0) {
-      contextRef.current.fillStyle = 'white';
-      contextRef.current.fillRect(selection.x, selection.y, selection.width, selection.height);
+    const activeLayer = getActiveLayer();
+    if (selection && activeLayer && selection.width > 0 && selection.height > 0) {
+      activeLayer.context.clearRect(selection.x, selection.y, selection.width, selection.height);
+      compositeLayers();
       saveState();
       clearSelection();
     }
   };
 
   const handlePaste = () => {
-    if (clipboard && contextRef.current && selection) {
-      contextRef.current.putImageData(clipboard, selection.x, selection.y);
+    const activeLayer = getActiveLayer();
+    if (clipboard && activeLayer && selection) {
+      activeLayer.context.putImageData(clipboard, selection.x, selection.y);
+      compositeLayers();
       saveState();
       clearSelection();
     }
   };
+
+  // Layer Management Functions
+  const addLayer = () => {
+    if (!canvas) return;
+    const newLayerId = `layer-${Date.now()}`;
+    const newLayerCanvas = document.createElement('canvas');
+    newLayerCanvas.width = canvas.width;
+    newLayerCanvas.height = canvas.height;
+    const newLayerContext = newLayerCanvas.getContext('2d')!;
+
+    const newLayer: Layer = {
+        id: newLayerId,
+        name: `Layer ${layers.length + 1}`,
+        canvas: newLayerCanvas,
+        context: newLayerContext,
+        visible: true,
+        opacity: 1,
+    };
+    setLayers(prev => [...prev, newLayer]);
+    setActiveLayerId(newLayerId);
+  };
+
+  const deleteLayer = (layerId: string) => {
+    setLayers(prev => prev.filter(l => l.id !== layerId));
+    if (activeLayerId === layerId && layers.length > 1) {
+        setActiveLayerId(layers[layers.length - 2].id);
+    } else if (layers.length <= 1) {
+        setActiveLayerId(null);
+    }
+  };
+
+  const toggleLayerVisibility = (layerId: string) => {
+    setLayers(prev => 
+        prev.map(l => l.id === layerId ? { ...l, visible: !l.visible } : l)
+    );
+  };
+
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -420,61 +459,118 @@ export default function Home() {
           <Separator />
 
           {/* Panel Triggers */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant='ghost' size="icon" aria-label="Brushes" onClick={() => handlePanelChange('brushes')}>
-                <Brush className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right"><p>Brushes</p></TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant='ghost' size="icon" aria-label="Layers" onClick={() => handlePanelChange('layers')}>
-                <Layers className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right"><p>Layers</p></TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant='ghost' size="icon" aria-label="Color Palette" onClick={() => handlePanelChange('colors')}>
-                <Palette className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right"><p>Color Palette</p></TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant='ghost' size="icon" aria-label="Filters & Effects" onClick={() => handlePanelChange('filters')}>
-                <Settings2 className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right"><p>Filters & Effects</p></TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant='ghost' size="icon" aria-label="AI Assistant" onClick={() => handlePanelChange('ai')}>
-                <Sparkles className="h-6 w-6" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right"><p>AI Assistant</p></TooltipContent>
-          </Tooltip>
-        </aside>
-
-        <Sheet open={!!activePanel} onOpenChange={(open) => !open && setActivePanel(null)}>
+           <Sheet>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Brushes">
+                    <Brush className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Brushes</p>
+              </TooltipContent>
+            </Tooltip>
             <SheetContent side="left" className="w-80 p-0 border-r z-50">
               <SheetHeader className="p-4 border-b">
-                <SheetTitle className="font-headline">{getPanelTitle()}</SheetTitle>
+                <SheetTitle className="font-headline">Brushes</SheetTitle>
               </SheetHeader>
-              {renderPanelContent()}
+              <BrushPanel />
             </SheetContent>
-        </Sheet>
+          </Sheet>
 
+          <Sheet>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Layers">
+                    <Layers className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Layers</p>
+              </TooltipContent>
+            </Tooltip>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle className="font-headline">Layers</SheetTitle>
+              </SheetHeader>
+              <LayersPanel 
+                layers={layers}
+                activeLayerId={activeLayerId}
+                onAddLayer={addLayer}
+                onDeleteLayer={deleteLayer}
+                onSelectLayer={setActiveLayerId}
+                onToggleVisibility={toggleLayerVisibility}
+              />
+            </SheetContent>
+          </Sheet>
+
+          <Sheet>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Color Palette">
+                    <Palette className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Color Palette</p>
+              </TooltipContent>
+            </Tooltip>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle className="font-headline">Color Palette</SheetTitle>
+              </SheetHeader>
+              <ColorPanel />
+            </SheetContent>
+          </Sheet>
+
+          <Sheet>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Filters & Effects">
+                    <Settings2 className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Filters & Effects</p>
+              </TooltipContent>
+            </Tooltip>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle className="font-headline">Filters & Effects</SheetTitle>
+              </SheetHeader>
+              <FiltersPanel />
+            </SheetContent>
+          </Sheet>
+          
+          <Sheet>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="AI Assistant">
+                    <Sparkles className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>AI Assistant</p>
+              </TooltipContent>
+            </Tooltip>
+            <SheetContent side="left" className="w-80 p-0 border-r z-50">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle className="font-headline">AI Assistant</SheetTitle>
+              </SheetHeader>
+              <AiAssistantPanel />
+            </SheetContent>
+          </Sheet>
+        </aside>
 
         {/* Main Content */}
         <div className="flex flex-1 flex-col">
@@ -556,14 +652,14 @@ export default function Home() {
                     <canvas
                         ref={canvasRef}
                         className="bg-white rounded-lg shadow-2xl border-2 border-dashed"
+                    />
+                     <canvas
+                        ref={selectionCanvasRef}
+                        className="absolute top-0 left-0 pointer-events-none z-10"
                         onMouseDown={startDrawing}
                         onMouseUp={finishDrawing}
                         onMouseMove={draw}
                         onMouseLeave={finishDrawing}
-                    />
-                    <canvas
-                        ref={selectionCanvasRef}
-                        className="absolute top-0 left-0 pointer-events-none z-10"
                     />
 
                     {selection && (

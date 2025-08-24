@@ -31,6 +31,7 @@ import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
 
 
 import AiAssistantPanel from '@/components/panels/ai-assistant-panel';
@@ -641,4 +642,3 @@ function ArtStudioPro() {
 }
 
 export default ArtStudioPro;
- 

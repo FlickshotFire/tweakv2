@@ -89,7 +89,7 @@ function ArtStudioPro() {
 
   // Selection state
   const [selection, setSelection] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
-  const [selectionStart, setSelectionStart] = useState<{ x: number, y: number } | null(null);
+  const [selectionStart, setSelectionStart] = useState<{ x: number, y: number } | null>(null);
 
   // Smudge tool state
   const [smudgeStrength, setSmudgeStrength] = useState(0.5);
@@ -692,3 +692,5 @@ function ArtStudioPro() {
 }
 
 export default ArtStudioPro;
+
+    
